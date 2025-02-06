@@ -473,28 +473,64 @@ class FileSyncManager(
                 logService.appendLog("目录: ${cmdDir.absolutePath}")
                 logService.appendLog("命令: ${command.command}")
 
+                // 获取系统环境变量
+                val env = System.getenv().toMutableMap()
+                
+                // 添加常用的路径和环境变量
+                val userHome = System.getProperty("user.home")
+                val paths = listOf(
+                    "/usr/local/bin",
+                    "/opt/homebrew/bin",
+                    "$userHome/.cargo/bin",
+                    "$userHome/.local/bin",
+                    "$userHome/go/bin",
+                    "/usr/local/go/bin"
+                )
+                
+                // 合并 PATH
+                val currentPath = env["PATH"] ?: ""
+                env["PATH"] = (paths + currentPath.split(File.pathSeparator))
+                    .distinct()
+                    .joinToString(File.pathSeparator)
+
+                // 执行命令，使用 shell 的初始化文件
+                val wrappedCommand = """
+                    source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null
+                    source ~/.profile 2>/dev/null
+                    ${command.command}
+                """.trimIndent()
+
                 // 执行命令
                 val process = ProcessBuilder().apply {
                     directory(cmdDir)
                     if (System.getProperty("os.name").toLowerCase().contains("windows")) {
                         command("cmd", "/c", command.command)
                     } else {
-                        command("sh", "-c", command.command)
+                        command("sh", "-c", wrappedCommand)
                     }
                     redirectErrorStream(true)
+                    environment().putAll(env)
                 }.start()
 
                 // 读取命令输出
+                var hasError = false
                 process.inputStream.bufferedReader().use { reader ->
                     var line: String?
                     while (reader.readLine().also { line = it } != null) {
-                        logService.appendLog(line ?: "")
+                        val output = line ?: ""
+                        logService.appendLog(output)
+                        // 检查是否包含错误信息，但忽略一些无害的错误
+                        if ((output.contains("error", ignoreCase = true) && !output.contains("successfully", ignoreCase = true)) || 
+                            output.contains("command not found", ignoreCase = true) ||
+                            (output.contains("no such file", ignoreCase = true) && !output.contains("generated", ignoreCase = true))) {
+                            hasError = true
+                        }
                     }
                 }
 
                 // 等待命令执行完成
                 val exitCode = process.waitFor()
-                if (exitCode != 0) {
+                if (exitCode != 0 || hasError) {
                     throw RuntimeException("命令执行失败，退出码: $exitCode")
                 }
 
