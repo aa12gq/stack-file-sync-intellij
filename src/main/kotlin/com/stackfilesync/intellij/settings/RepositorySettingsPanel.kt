@@ -316,7 +316,18 @@ class RepositorySettingsPanel(private val project: Project) {
             }
         }
         
-        return panel!!
+        // 创建一个带滚动条的面板
+        val scrollPane = JBScrollPane(panel).apply {
+            border = null  // 移除滚动面板的边框
+            verticalScrollBar.unitIncrement = 16  // 设置滚动速度
+            horizontalScrollBarPolicy = JScrollPane.HORIZONTAL_SCROLLBAR_NEVER  // 禁用水平滚动条
+        }
+        
+        // 创建一个容器面板来持有滚动面板
+        return JPanel(BorderLayout()).apply {
+            add(scrollPane, BorderLayout.CENTER)
+            preferredSize = Dimension(800, 600)  // 设置首选大小
+        }
     }
 
     fun getRepository(): Repository = repository
