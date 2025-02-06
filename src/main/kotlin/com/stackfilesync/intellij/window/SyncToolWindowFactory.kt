@@ -4,41 +4,53 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
+import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.OnePixelSplitter
+import com.intellij.execution.ui.ConsoleView
+import com.intellij.execution.ui.ConsoleViewContentType
+import com.intellij.execution.impl.ConsoleViewImpl
+import com.stackfilesync.intellij.logs.LogService
 import javax.swing.JPanel
-import javax.swing.JTabbedPane
+import javax.swing.JLabel
+import javax.swing.JComponent
+import java.awt.BorderLayout
+import java.awt.Dimension
 
 class SyncToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val contentFactory = ContentFactory.getInstance()
+        val panel = JPanel(BorderLayout())
         
-        // 创建主面板
-        val mainPanel = JTabbedPane()
+        // 创建上部分的仓库列表面板
+        val repositoryPanel = createRepositoryPanel(project)
         
-        // 添加仓库列表面板
-        val repositoriesPanel = createRepositoriesPanel(project)
-        mainPanel.addTab("仓库", repositoriesPanel)
+        // 创建下部分的日志面板
+        val logService = LogService.getInstance(project)
+        val consoleView = ConsoleViewImpl(project, true).apply {
+            allowHeavyFilters()
+        }
+        logService.setConsoleView(consoleView)
         
-        // 添加日志面板
-        val logsPanel = createLogsPanel(project)
-        mainPanel.addTab("日志", logsPanel)
+        // 创建一个带标题的日志面板
+        val logPanel = JPanel(BorderLayout()).apply {
+            add(JLabel("同步日志"), BorderLayout.NORTH)
+            add(JBScrollPane(consoleView.component), BorderLayout.CENTER)
+        }
         
-        // 添加同步历史面板
-        val historyPanel = createHistoryPanel(project)
-        mainPanel.addTab("历史", historyPanel)
+        // 使用分隔面板分隔仓库列表和日志
+        val splitPane = OnePixelSplitter(true, 0.6f).apply {
+            firstComponent = repositoryPanel
+            secondComponent = logPanel
+            dividerWidth = 3
+        }
         
-        val content = contentFactory.createContent(mainPanel, "", false)
+        panel.add(splitPane, BorderLayout.CENTER)
+        
+        // 添加到工具窗口
+        val content = ContentFactory.getInstance().createContent(panel, "", false)
         toolWindow.contentManager.addContent(content)
     }
 
-    private fun createRepositoriesPanel(project: Project): JPanel {
+    private fun createRepositoryPanel(project: Project): JComponent {
         return RepositoriesPanel(project)
-    }
-
-    private fun createLogsPanel(project: Project): JPanel {
-        return LogsPanel(project)
-    }
-
-    private fun createHistoryPanel(project: Project): JPanel {
-        return HistoryPanel(project)
     }
 } 

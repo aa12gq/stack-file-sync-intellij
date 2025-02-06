@@ -50,14 +50,11 @@ class FileSyncManager(
         try {
             validateConfig(repository)
             
-            // 激活日志窗口
+            // 激活主窗口
             invokeLater {
                 val toolWindow = ToolWindowManager.getInstance(project)
-                    .getToolWindow("Stack File Sync Logs")
-                if (!toolWindow?.isVisible!!) {
-                    toolWindow.show(null)
-                }
-                toolWindow.activate(null)
+                    .getToolWindow("Stack File Sync")
+                toolWindow?.show()
             }
             
             logService.clear()

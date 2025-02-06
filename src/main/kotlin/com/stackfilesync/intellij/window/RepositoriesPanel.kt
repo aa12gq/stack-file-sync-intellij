@@ -1,212 +1,122 @@
 package com.stackfilesync.intellij.window
 
-import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBScrollPane
-import com.intellij.ui.table.JBTable
-import com.intellij.util.ui.JBUI
-import com.stackfilesync.intellij.model.Repository
+import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.builder.Align
 import com.stackfilesync.intellij.settings.SyncSettingsState
-import javax.swing.*
-import javax.swing.table.AbstractTableModel
-import com.intellij.openapi.actionSystem.AnActionEvent
-import javax.swing.table.DefaultTableCellRenderer
-import java.awt.Component
-import com.stackfilesync.intellij.dialog.BackupBrowserDialog
-import com.intellij.ui.JBColor
+import com.stackfilesync.intellij.sync.FileSyncManager
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.Task
+import com.intellij.openapi.progress.ProgressIndicator
+import javax.swing.JPanel
+import java.awt.BorderLayout
+import javax.swing.JButton
+import javax.swing.Box
+import javax.swing.BoxLayout
+import com.intellij.ui.components.JBList
+import javax.swing.DefaultListModel
+import javax.swing.ListSelectionModel
+import com.stackfilesync.intellij.model.Repository
 import com.intellij.icons.AllIcons
-import com.stackfilesync.intellij.icons.StackFileSync
-import com.intellij.util.ui.UIUtil
-import com.intellij.openapi.actionSystem.Presentation
-import com.intellij.openapi.actionSystem.CommonDataKeys
-import com.intellij.openapi.actionSystem.impl.SimpleDataContext
-import com.intellij.openapi.actionSystem.DataKey
+import javax.swing.JLabel
+import javax.swing.BorderFactory
+import java.awt.Dimension
+import com.intellij.openapi.options.ShowSettingsUtil
 
-class RepositoriesPanel(private val project: Project) : JPanel() {
-    companion object {
-        private val REPOSITORY_KEY = DataKey.create<Repository>("repository")
+class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
+    private val listModel = DefaultListModel<Repository>()
+    private val repositoryList = JBList(listModel).apply {
+        selectionMode = ListSelectionModel.SINGLE_SELECTION
+        cellRenderer = RepositoryListCellRenderer()
     }
 
-    private val table: JBTable
-    private val tableModel: RepositoriesTableModel
-    private val settings = SyncSettingsState.getInstance()
-    
     init {
-        layout = BoxLayout(this, BoxLayout.Y_AXIS)
-        border = JBUI.Borders.empty(10)
-        
-        // 创建工具栏
-        val actionGroup = DefaultActionGroup().apply {
-            add(ActionManager.getInstance().getAction("StackFileSync.SyncFiles"))
-            add(ActionManager.getInstance().getAction("StackFileSync.Configure"))
-            addSeparator()
-            add(ActionManager.getInstance().getAction("StackFileSync.RefreshRepositories"))
+        // 创建顶部工具栏
+        val toolbar = JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.X_AXIS)
+            add(JLabel("仓库列表"))
+            add(Box.createHorizontalGlue())
+            add(JButton(AllIcons.General.Add).apply {
+                toolTipText = "添加仓库"
+                addActionListener {
+                    ShowSettingsUtil.getInstance().showSettingsDialog(
+                        project,
+                        "Stack File Sync"
+                    )
+                }
+            })
+            border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
         }
-        
-        val toolbar = ActionManager.getInstance()
-            .createActionToolbar("StackFileSyncToolbar", actionGroup, true)
-        add(toolbar.component)
-        
-        // 创建表格
-        tableModel = RepositoriesTableModel()
-        table = JBTable(tableModel).apply {
-            setShowGrid(true)
-            autoResizeMode = JTable.AUTO_RESIZE_ALL_COLUMNS
+
+        // 创建仓库列表面板
+        val listPanel = JPanel(BorderLayout()).apply {
+            add(JBScrollPane(repositoryList), BorderLayout.CENTER)
         }
-        
-        add(JBScrollPane(table))
-        
-        // 设置自动同步列的渲染器
-        table.getColumnModel().getColumn(3).cellRenderer = AutoSyncColumnRenderer()
-        
-        // 设置表格样式
-        table.apply {
-            gridColor = JBColor.border()
-            rowHeight = JBUI.scale(24)
-            intercellSpacing = JBUI.size(1)
-            
-            // 设置选择样式
-            selectionBackground = UIUtil.getTableSelectionBackground(true)
-            selectionForeground = UIUtil.getTableSelectionForeground(true)
+
+        // 创建底部操作按钮
+        val buttonPanel = JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.X_AXIS)
+            add(Box.createHorizontalGlue())
+            add(JButton("同步").apply {
+                addActionListener {
+                    val selected = repositoryList.selectedValue
+                    if (selected != null) {
+                        syncRepository(selected)
+                    }
+                }
+            })
+            border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
         }
-        
-        // 加载数据
+
+        // 组装面板
+        add(toolbar, BorderLayout.NORTH)
+        add(listPanel, BorderLayout.CENTER)
+        add(buttonPanel, BorderLayout.SOUTH)
+
+        // 加载仓库列表
         loadRepositories()
+
+        // 设置首选大小
+        preferredSize = Dimension(300, 400)
     }
-    
+
+    private fun loadRepositories() {
+        listModel.clear()
+        val settings = SyncSettingsState.getInstance()
+        settings.getRepositories().forEach { repository ->
+            listModel.addElement(repository)
+        }
+    }
+
     fun refresh() {
         loadRepositories()
-        tableModel.fireTableDataChanged()
-    }
-    
-    private fun loadRepositories() {
-        tableModel.repositories = settings.getRepositories()
-    }
-    
-    private inner class RepositoriesTableModel : AbstractTableModel() {
-        var repositories: List<Repository> = emptyList()
-        private val columns = listOf("名称", "URL", "分支", "自动同步", "最后同步时间")
-        
-        override fun getRowCount(): Int = repositories.size
-        override fun getColumnCount(): Int = columns.size
-        override fun getColumnName(column: Int): String = columns[column]
-        
-        override fun getColumnClass(columnIndex: Int): Class<*> {
-            return when (columnIndex) {
-                3 -> Icon::class.java // 自动同步状态列显示图标
-                else -> String::class.java
-            }
-        }
-        
-        override fun getValueAt(rowIndex: Int, columnIndex: Int): Any {
-            val repo = repositories[rowIndex]
-            return when (columnIndex) {
-                0 -> repo.name
-                1 -> repo.url
-                2 -> repo.branch
-                3 -> if (repo.autoSync?.enabled == true) {
-                    StackFileSync.AutoSync
-                } else {
-                    StackFileSync.AutoSyncDisabled
-                }
-                4 -> "N/A" // TODO: 实现最后同步时间
-                else -> ""
-            }
-        }
     }
 
-    // 添加右键菜单
-    private fun createPopupMenu(): JPopupMenu {
-        return JPopupMenu().apply {
-            add(JMenuItem("同步文件").apply {
-                addActionListener {
-                    val selectedRow = table.selectedRow
-                    if (selectedRow >= 0) {
-                        val repo = tableModel.repositories[selectedRow]
-                        ActionManager.getInstance()
-                            .getAction("StackFileSync.SyncFiles")
-                            .actionPerformed(AnActionEvent(
-                                null,
-                                SimpleDataContext.builder()
-                                    .add(CommonDataKeys.PROJECT, project)
-                                    .add(REPOSITORY_KEY, repo)
-                                    .build(),
-                                "StackFileSync",
-                                Presentation(),
-                                ActionManager.getInstance(),
-                                0
-                            ))
-                    }
-                }
-            })
-            
-            addSeparator()
-            
-            add(JMenuItem("启用/禁用自动同步").apply {
-                addActionListener {
-                    val selectedRow = table.selectedRow
-                    if (selectedRow >= 0) {
-                        val repo = tableModel.repositories[selectedRow]
-                        val action = ActionManager.getInstance()
-                            .getAction("StackFileSync.ToggleAutoSync")
-                        
-                        val dataContext = SimpleDataContext.builder()
-                            .add(CommonDataKeys.PROJECT, project)
-                            .add(REPOSITORY_KEY, repo)
-                            .build()
-                        
-                        val event = AnActionEvent(
-                            null,
-                            dataContext,
-                            "StackFileSync",
-                            Presentation(),
-                            ActionManager.getInstance(),
-                            0
-                        )
-                        
-                        action.actionPerformed(event)
-                        tableModel.fireTableDataChanged()
-                    }
-                }
-            })
-            
-            addSeparator()
-            
-            add(JMenuItem("浏览备份历史").apply {
-                addActionListener {
-                    val selectedRow = table.selectedRow
-                    if (selectedRow >= 0) {
-                        val repo = tableModel.repositories[selectedRow]
-                        BackupBrowserDialog(project, repo).show()
-                    }
-                }
-            })
-        }
-    }
-
-    // 自定义表格渲染器
-    private class AutoSyncColumnRenderer : DefaultTableCellRenderer() {
-        override fun getTableCellRendererComponent(
-            table: JTable?,
-            value: Any?,
-            isSelected: Boolean,
-            hasFocus: Boolean,
-            row: Int,
-            column: Int
-        ): Component {
-            super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column)
-            
-            if (value is Icon) {
-                icon = value
-                text = if ((value as? ImageIcon)?.description == "enabled") {
-                    "已启用"
-                } else {
-                    "已禁用"
+    private fun syncRepository(repository: Repository) {
+        ProgressManager.getInstance().run(
+            object : Task.Backgroundable(project, "同步文件", false) {
+                override fun run(indicator: ProgressIndicator) {
+                    FileSyncManager(project, indicator).sync(repository)
                 }
             }
-            
-            return this
+        )
+    }
+}
+
+class RepositoryListCellRenderer : javax.swing.DefaultListCellRenderer() {
+    override fun getListCellRendererComponent(
+        list: javax.swing.JList<*>?,
+        value: Any?,
+        index: Int,
+        isSelected: Boolean,
+        cellHasFocus: Boolean
+    ): java.awt.Component {
+        super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
+        if (value is Repository) {
+            text = value.name
+            icon = AllIcons.Nodes.Module
         }
+        return this
     }
 } 
