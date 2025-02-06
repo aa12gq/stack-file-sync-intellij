@@ -20,8 +20,15 @@ import com.intellij.ui.components.JBTextField
 import com.stackfilesync.intellij.model.AutoSyncConfig
 import com.stackfilesync.intellij.model.InternalSyncConfig
 import javax.swing.JPanel
+import com.stackfilesync.intellij.model.PostSyncCommand
+import com.intellij.openapi.project.Project
+import java.awt.Dimension
+import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.builder.Panel
+import com.intellij.ui.dsl.builder.bindSelected
+import com.intellij.ui.dsl.builder.bindText
 
-class RepositorySettingsPanel {
+class RepositorySettingsPanel(private val project: Project) {
     private lateinit var panel: DialogPanel
     private var repository = Repository()
 
@@ -169,6 +176,141 @@ class RepositorySettingsPanel {
                                 }
                             }
                         )
+                }
+            }
+
+            group("后处理命令") {
+                row {
+                    comment("""
+                        后处理命令会在文件同步完成后执行。常见用途：
+                        1. 编译 proto 文件，例如：
+                           目录: proto
+                           命令: protoc --go_out=. *.proto
+                        
+                        2. 更新依赖，例如：
+                           目录: .
+                           命令: go mod tidy
+                        
+                        3. 生成代码，例如：
+                           目录: api
+                           命令: swag init
+                        
+                        4. 执行构建，例如：
+                           目录: .
+                           命令: mvn compile
+                        
+                        注意：目录路径可以是相对于项目根目录的路径，也可以是绝对路径
+                    """.trimIndent())
+                }
+                
+                lateinit var commandList: JBList<PostSyncCommand>
+                lateinit var listModel: DefaultListModel<PostSyncCommand>
+                
+                fun updateCommands() {
+                    val commands = mutableListOf<PostSyncCommand>()
+                    for (i in 0 until listModel.size) {
+                        commands.add(listModel.getElementAt(i))
+                    }
+                    repository.postSyncCommands = commands
+                }
+                
+                row {
+                    commandList = JBList()
+                    listModel = DefaultListModel()
+                    commandList.model = listModel
+                    
+                    // 设置渲染器
+                    commandList.cellRenderer = object : DefaultListCellRenderer() {
+                        override fun getListCellRendererComponent(
+                            list: JList<*>,
+                            value: Any?,
+                            index: Int,
+                            isSelected: Boolean,
+                            cellHasFocus: Boolean
+                        ): Component {
+                            super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
+                            val command = value as PostSyncCommand
+                            text = "${command.directory}: ${command.command}"
+                            return this
+                        }
+                    }
+                    
+                    // 初始化列表
+                    repository.postSyncCommands.forEach { command ->
+                        listModel.addElement(command)
+                    }
+                    
+                    cell(JBScrollPane(commandList))
+                        .align(Align.FILL)
+                        .resizableColumn()
+                }
+                
+                row {
+                    // 添加和删除按钮
+                    button("添加命令") {
+                        val dialog = object : DialogWrapper(project, true) {
+                            private val directoryField = JBTextField()
+                            private val commandField = JBTextField()
+                            
+                            init {
+                                title = "添加后处理命令"
+                                init()
+                            }
+                            
+                            override fun createCenterPanel(): JComponent {
+                                val dialogPanel = JPanel(BorderLayout())
+                                val content = panel {
+                                    row("目录:") {
+                                        cell(directoryField)
+                                            .comment("相对于项目根目录的路径，或绝对路径")
+                                            .focused()
+                                            .resizableColumn()
+                                            .align(Align.FILL)
+                                            .gap(RightGap.SMALL)
+                                    }
+                                    row("命令:") {
+                                        cell(commandField)
+                                            .comment("要执行的命令")
+                                            .resizableColumn()
+                                            .align(Align.FILL)
+                                            .gap(RightGap.SMALL)
+                                    }
+                                }
+
+                                // 将 Panel 转换为 JComponent 并添加到对话框面板
+                                (content as JComponent).apply {
+                                    border = JBUI.Borders.empty(10)
+                                }.also { 
+                                    dialogPanel.add(it, BorderLayout.CENTER)
+                                }
+
+                                dialogPanel.preferredSize = Dimension(400, 100)
+                                return dialogPanel
+                            }
+                            
+                            fun getCommand(): PostSyncCommand? {
+                                val dir = directoryField.text
+                                val cmd = commandField.text
+                                if (dir.isBlank() || cmd.isBlank()) return null
+                                return PostSyncCommand(dir, cmd)
+                            }
+                        }
+                        
+                        if (dialog.showAndGet()) {
+                            dialog.getCommand()?.let { command ->
+                                listModel.addElement(command)
+                                updateCommands()
+                            }
+                        }
+                    }
+                    
+                    button("删除命令") {
+                        val selected = commandList.selectedIndex
+                        if (selected >= 0) {
+                            listModel.remove(selected)
+                            updateCommands()
+                        }
+                    }
                 }
             }
         }

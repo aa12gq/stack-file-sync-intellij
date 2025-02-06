@@ -32,10 +32,10 @@
             <li><b>初始配置</b>
                 <ul>
                     <li>打开 Settings -> Tools -> Stack File Sync</li>
-                    <li>点击 "+" 添加新的同步仓库</li>
+                    <li>点击 "+" 新的同步仓库</li>
                     <li>填写仓库信息：名称、Git URL、分支等</li>
                     <li>配置源目录和目标目录</li>
-                    <li>添加文件匹配模式（如 *.proto）</li>
+                    <li>文件匹配模式（如 *.proto）</li>
                 </ul>
             </li>
             <li><b>同步文件</b>
@@ -98,26 +98,26 @@
                    anchor="right"
                    factoryClass="com.stackfilesync.intellij.window.SyncToolWindowFactory"/>
                    
-        <!-- 持久化配置 -->
-        <applicationService 
-            serviceImplementation="com.stackfilesync.intellij.settings.SyncSettings"/>
-            
-        <!-- 配置界面 -->
-        <applicationConfigurable 
-            parentId="tools"
-            instance="com.stackfilesync.intellij.settings.SyncSettingsConfigurable"
-            id="com.stackfilesync.intellij.settings.SyncSettingsConfigurable"
-            displayName="Stack File Sync"/>
+        <!-- 设置页面配置 -->
+        <applicationConfigurable
+                parentId="tools"
+                instance="com.stackfilesync.intellij.settings.SyncSettings"
+                id="com.stackfilesync.intellij.settings.SyncSettings"
+                displayName="Stack File Sync"/>
+                
+        <!-- 持久化服务 -->
+        <applicationService
+                serviceImplementation="com.stackfilesync.intellij.settings.SyncSettingsState"/>
         
-        <!-- 添加历史记录服务 -->
+        <!-- 历史记录服务 -->
         <applicationService 
             serviceImplementation="com.stackfilesync.intellij.service.SyncHistoryService"/>
         
-        <!-- 添加自动同步服务 -->
+        <!-- 自动同步服务 -->
         <projectService 
             serviceImplementation="com.stackfilesync.intellij.sync.AutoSyncManager"/>
         
-        <!-- 添加通知组 -->
+        <!-- 通知组 -->
         <notificationGroup id="Stack File Sync"
                           displayType="BALLOON"
                           key="notification.group.name"/>
@@ -143,7 +143,7 @@
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt COMMA"/>
         </action>
         
-        <!-- 添加自动同步动作 -->
+        <!-- 自动同步动作 -->
         <action id="StackFileSync.ToggleAutoSync"
                 class="com.stackfilesync.intellij.actions.ToggleAutoSyncAction"
                 text="切换自动同步"

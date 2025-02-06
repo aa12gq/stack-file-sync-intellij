@@ -7,7 +7,7 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
 import com.stackfilesync.intellij.model.Repository
-import com.stackfilesync.intellij.settings.SyncSettings
+import com.stackfilesync.intellij.settings.SyncSettingsState
 import javax.swing.*
 import javax.swing.table.AbstractTableModel
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -30,6 +30,7 @@ class RepositoriesPanel(private val project: Project) : JPanel() {
 
     private val table: JBTable
     private val tableModel: RepositoriesTableModel
+    private val settings = SyncSettingsState.getInstance()
     
     init {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
@@ -80,7 +81,7 @@ class RepositoriesPanel(private val project: Project) : JPanel() {
     }
     
     private fun loadRepositories() {
-        tableModel.repositories = SyncSettings.getInstance().getRepositories()
+        tableModel.repositories = settings.getRepositories()
     }
     
     private inner class RepositoriesTableModel : AbstractTableModel() {

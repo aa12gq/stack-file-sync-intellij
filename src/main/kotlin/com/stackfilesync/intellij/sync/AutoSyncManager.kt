@@ -6,7 +6,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.stackfilesync.intellij.model.Repository
-import com.stackfilesync.intellij.settings.SyncSettings
+import com.stackfilesync.intellij.settings.SyncSettingsState
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.Executors
@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit
 class AutoSyncManager(private val project: Project) {
     private val executor: ScheduledExecutorService = Executors.newScheduledThreadPool(1)
     private val syncTasks = ConcurrentHashMap<String, ScheduledFuture<*>>()
+    private val settings = SyncSettingsState.getInstance()
     
     init {
         // 启动所有自动同步任务
@@ -28,7 +29,6 @@ class AutoSyncManager(private val project: Project) {
         stopAllAutoSync()
         
         // 获取配置
-        val settings = SyncSettings.getInstance()
         val repositories = settings.getRepositories()
         
         // 启动新任务

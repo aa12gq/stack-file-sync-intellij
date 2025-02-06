@@ -10,7 +10,7 @@ class RepositorySettingsDialog(
     project: Project,
     private val repository: Repository
 ) : DialogWrapper(project) {
-    private val panel = RepositorySettingsPanel()
+    private val panel = RepositorySettingsPanel(project)
     
     init {
         title = "仓库设置"

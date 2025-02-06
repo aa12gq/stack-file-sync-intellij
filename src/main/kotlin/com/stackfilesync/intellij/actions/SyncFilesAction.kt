@@ -7,14 +7,14 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.stackfilesync.intellij.model.Repository
-import com.stackfilesync.intellij.settings.SyncSettings
+import com.stackfilesync.intellij.settings.SyncSettingsState
 import com.stackfilesync.intellij.sync.FileSyncManager
 import com.stackfilesync.intellij.dialog.RepositoryChooserDialog
 
 class SyncFilesAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val settings = SyncSettings.getInstance()
+        val settings = SyncSettingsState.getInstance()
         val repositories = settings.getRepositories()
 
         if (repositories.isEmpty()) {
