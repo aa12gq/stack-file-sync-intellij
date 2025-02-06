@@ -121,6 +121,18 @@
         <notificationGroup id="Stack File Sync"
                           displayType="BALLOON"
                           key="notification.group.name"/>
+        
+        <!-- 日志服务 -->
+        <projectService 
+            serviceImplementation="com.stackfilesync.intellij.logs.LogService"/>
+        
+        <!-- 日志窗口 -->
+        <toolWindow id="Stack File Sync Logs" 
+                    secondary="false"
+                    icon="AllIcons.General.MessageHistory"
+                    anchor="right"
+                    canCloseContents="false"
+                    factoryClass="com.stackfilesync.intellij.logs.LogsViewProvider"/>
     </extensions>
 
     <actions>

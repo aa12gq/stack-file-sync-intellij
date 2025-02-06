@@ -25,6 +25,12 @@ import javax.swing.JComponent
 import java.awt.Dimension
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.invokeLater
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import com.intellij.openapi.wm.ToolWindowManager
+import com.intellij.openapi.wm.ToolWindow
+import com.stackfilesync.intellij.logs.LogsViewProvider
+import com.stackfilesync.intellij.logs.LogService
 
 class FileSyncManager(
     private val project: Project,
@@ -34,6 +40,7 @@ class FileSyncManager(
     private val tempDir = Files.createTempDirectory("stack-file-sync")
     private var syncedFiles = mutableListOf<String>()
     private val backupManager = BackupManager(project)
+    private val logService = LogService.getInstance(project)
 
     fun sync(repository: Repository) {
         val startTime = System.currentTimeMillis()
@@ -43,32 +50,62 @@ class FileSyncManager(
         try {
             validateConfig(repository)
             
+            // 激活日志窗口
+            invokeLater {
+                val toolWindow = ToolWindowManager.getInstance(project)
+                    .getToolWindow("Stack File Sync Logs")
+                if (!toolWindow?.isVisible!!) {
+                    toolWindow.show(null)
+                }
+                toolWindow.activate(null)
+            }
+            
+            logService.clear()
+            logService.appendLog("开始同步仓库: ${repository.name}")
+            
             indicator.text = "准备同步..."
             indicator.isIndeterminate = true
             
+            // 同步文件
             syncFromGit(repository)
             
-            // 执行后处理命令
-            executePostSyncCommands(repository)
+            // 在同步成功后执行后处理命令
+            if (!repository.postSyncCommands.isNullOrEmpty()) {
+                logService.appendLog("\n开始执行后处理命令...")
+                indicator.text = "执行后处理命令..."
+                executePostSyncCommands(repository)
+                logService.appendLog("所有命令执行完成")
+            }
             
             success = true
-            NotificationUtils.showInfo(
-                project,
-                "同步成功",
-                "已成功同步 ${syncedFiles.size} 个文件"
-            )
+            logService.appendLog("\n✅ 同步完成")
+            
+            // 在 EDT 线程上显示通知
+            invokeLater {
+                NotificationUtils.showInfo(
+                    project,
+                    "同步成功",
+                    "已成功同步 ${syncedFiles.size} 个文件"
+                )
+            }
             
         } catch (e: SyncException) {
             error = e.message
-            NotificationUtils.showError(project, "同步失败", e.message ?: "未知错误")
+            logService.appendLog("\n❌ 同步失败: ${e.message}")
+            invokeLater {
+                NotificationUtils.showError(project, "同步失败", e.message ?: "未知错误")
+            }
             throw e
         } catch (e: Exception) {
             error = e.message
-            NotificationUtils.showError(
-                project,
-                "同步失败",
-                "发生未知错误: ${e.message}"
-            )
+            logService.appendLog("\n❌ 同步失败: ${e.message}")
+            invokeLater {
+                NotificationUtils.showError(
+                    project,
+                    "同步失败",
+                    "发生未知错误: ${e.message}"
+                )
+            }
             throw SyncException.GitException("同步失败", e)
         } finally {
             // 清理临时目录
@@ -114,10 +151,14 @@ class FileSyncManager(
             val gitDir = tempDir.resolve(repository.name)
             
             // 克隆仓库
+            logService.appendLog("克隆仓库: ${repository.url}")
             cloneRepository(repository, gitDir)
             
             // 同步文件
+            logService.appendLog("开始同步文件...")
             syncFiles(repository, gitDir)
+            
+            logService.appendLog("文件同步完成")
             
         } catch (e: Exception) {
             val errorMessage = when (e) {
@@ -125,11 +166,14 @@ class FileSyncManager(
                 else -> "同步失败: ${e.message}"
             }
             
-            NotificationUtils.showError(
-                project,
-                "同步失败",
-                errorMessage ?: "未知错误"
-            )
+            logService.appendLog("❌ $errorMessage")
+            invokeLater {
+                NotificationUtils.showError(
+                    project,
+                    "同步失败",
+                    errorMessage ?: "未知错误"
+                )
+            }
             
             throw e
         }
@@ -173,11 +217,13 @@ class FileSyncManager(
                     错误信息: ${result.errorOutput}
                 """.trimIndent()
                 
-                NotificationUtils.showError(
-                    project,
-                    "同步失败",
-                    errorMessage
-                )
+                invokeLater {
+                    NotificationUtils.showError(
+                        project,
+                        "同步失败",
+                        errorMessage
+                    )
+                }
                 
                 throw SyncException.GitException(errorMessage)
             }
@@ -190,11 +236,13 @@ class FileSyncManager(
                 错误信息: ${e.message}
             """.trimIndent()
             
-            NotificationUtils.showError(
-                project,
-                "同步失败",
-                errorMessage
-            )
+            invokeLater {
+                NotificationUtils.showError(
+                    project,
+                    "同步失败",
+                    errorMessage
+                )
+            }
             
             throw SyncException.GitException(errorMessage, e)
         }
@@ -231,11 +279,13 @@ class FileSyncManager(
                 """.trimIndent()
                 
                 // 显示错误通知
-                NotificationUtils.showError(
-                    project,
-                    "切换分支失败",
-                    errorMessage
-                )
+                invokeLater {
+                    NotificationUtils.showError(
+                        project,
+                        "切换分支失败",
+                        errorMessage
+                    )
+                }
                 
                 throw SyncException.GitException(errorMessage)
             }
@@ -253,11 +303,13 @@ class FileSyncManager(
             """.trimIndent()
             
             // 显示错误通知
-            NotificationUtils.showError(
-                project,
-                "切换分支失败",
-                errorMessage
-            )
+            invokeLater {
+                NotificationUtils.showError(
+                    project,
+                    "切换分支失败",
+                    errorMessage
+                )
+            }
             
             throw SyncException.GitException(errorMessage, e)
         }
@@ -277,7 +329,7 @@ class FileSyncManager(
                     1. 源目录路径是否正确
                     2. 仓库是否包含该目录
                 """.trimIndent()
-                showNotification("同步失败", errorMessage, true)
+                logService.appendLog("❌ $errorMessage")
                 throw SyncException.FileException(errorMessage)
             }
             
@@ -286,20 +338,21 @@ class FileSyncManager(
             val files = findFilesToSync(sourceDir, repository)
             
             if (files.isEmpty()) {
-                showNotification("同步成功", "已成功同步 0 个文件")
+                logService.appendLog("没有找到需要同步的文件")
                 return
             }
 
-            // 同步所有匹配的文件，不需要用户选择
+            logService.appendLog("找到 ${files.size} 个文件需要同步")
+
+            // 同步所有匹配的文件
             indicator.isIndeterminate = false
             indicator.fraction = 0.0
             
             // 备份现有文件
-            indicator.text = "正在备份文件..."
+            logService.appendLog("正在备份文件...")
             backupSelectedFiles(repository, files, targetDir)
             
             // 同步文件
-            var successCount = 0
             files.forEachIndexed { index, file ->
                 try {
                     val relativePath = sourceDir.relativize(file)
@@ -312,25 +365,24 @@ class FileSyncManager(
                     Files.copy(file, targetFile, StandardCopyOption.REPLACE_EXISTING)
                     
                     syncedFiles.add(relativePath.toString())
-                    successCount++
                     
                     // 更新进度
                     indicator.fraction = (index + 1).toDouble() / files.size
                     indicator.text = "正在同步: $relativePath (${index + 1}/${files.size})"
+                    logService.appendLog("同步文件: $relativePath")
                     
                 } catch (e: Exception) {
                     val errorMessage = "同步文件失败: ${file}, 原因: ${e.message}"
-                    showNotification("同步失败", errorMessage, true)
+                    logService.appendLog("❌ $errorMessage")
                     throw SyncException.FileException(errorMessage, e)
                 }
             }
             
-            // 显示成功通知
-            showNotification("同步成功", "已成功同步 $successCount 个文件")
+            logService.appendLog("✅ 成功同步 ${files.size} 个文件")
             
         } catch (e: Exception) {
             val errorMessage = "同步失败: ${e.message}"
-            showNotification("同步失败", errorMessage, true)
+            logService.appendLog("❌ $errorMessage")
             throw SyncException.FileException(errorMessage, e)
         }
     }
@@ -385,7 +437,9 @@ class FileSyncManager(
             backupManager.backupFiles(repository, existingFiles)
         } catch (e: Exception) {
             val errorMessage = "备份文件失败: ${e.message}"
-            NotificationUtils.showError(project, "备份失败", errorMessage)
+            invokeLater {
+                NotificationUtils.showError(project, "备份失败", errorMessage)
+            }
             throw SyncException.FileException(errorMessage, e)
         }
     }
@@ -399,46 +453,59 @@ class FileSyncManager(
     }
 
     private fun executePostSyncCommands(repository: Repository) {
-        repository.postSyncCommands.forEach { command ->
+        val workspaceRoot = project.basePath ?: throw RuntimeException("无法获取项目目录")
+        
+        repository.postSyncCommands.forEachIndexed { index, command ->
             try {
-                indicator.text = "执行命令: ${command.command}"
+                logService.appendLog("\n执行命令 ${index + 1}/${repository.postSyncCommands.size}")
                 
-                val projectDir = project.basePath?.let { File(it) }
-                    ?: throw RuntimeException("无法获取项目目录")
-                    
-                val workingDir = if (command.directory.startsWith("/")) {
+                // 解析命令执行目录
+                val cmdDir = if (command.directory.startsWith("/")) {
                     File(command.directory)
                 } else {
-                    File(projectDir, command.directory)
+                    File(workspaceRoot, command.directory)
                 }
-                
-                if (!workingDir.exists()) {
-                    throw RuntimeException("命令执行目录不存在: ${workingDir.absolutePath}")
+
+                // 检查目录是否存在
+                if (!cmdDir.exists()) {
+                    val errorMessage = "命令执行目录不存在: ${cmdDir.absolutePath}"
+                    logService.appendLog("❌ $errorMessage")
+                    throw RuntimeException(errorMessage)
                 }
-                
-                val result = CommandExecutor.execute(command.command, workingDir).get()
-                
-                if (result.exitCode != 0) {
-                    throw RuntimeException(
-                        """
-                        命令执行失败:
-                        Exit Code: ${result.exitCode}
-                        Error: ${result.error}
-                        Output: ${result.output}
-                        """.trimIndent()
-                    )
+
+                logService.appendLog("目录: ${cmdDir.absolutePath}")
+                logService.appendLog("命令: ${command.command}")
+
+                // 执行命令
+                val process = ProcessBuilder().apply {
+                    directory(cmdDir)
+                    if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+                        command("cmd", "/c", command.command)
+                    } else {
+                        command("sh", "-c", command.command)
+                    }
+                    redirectErrorStream(true)
+                }.start()
+
+                // 读取命令输出
+                process.inputStream.bufferedReader().use { reader ->
+                    var line: String?
+                    while (reader.readLine().also { line = it } != null) {
+                        logService.appendLog(line ?: "")
+                    }
                 }
-                
-                // 记录命令输出
-                if (result.output.isNotBlank()) {
-                    indicator.text = "命令输出:\n${result.output}"
+
+                // 等待命令执行完成
+                val exitCode = process.waitFor()
+                if (exitCode != 0) {
+                    throw RuntimeException("命令执行失败，退出码: $exitCode")
                 }
-                
+
+                logService.appendLog("✅ 命令执行成功")
             } catch (e: Exception) {
-                throw SyncException.CommandException(
-                    "执行命令失败: ${command.command}",
-                    e
-                )
+                val errorMessage = "执行命令失败: ${command.command}\n错误: ${e.message}"
+                logService.appendLog("❌ $errorMessage")
+                throw SyncException.CommandException(errorMessage, e)
             }
         }
     }

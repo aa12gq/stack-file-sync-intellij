@@ -2,6 +2,7 @@ package com.stackfilesync.intellij.model
 
 import com.intellij.util.xmlb.annotations.Tag
 import com.intellij.util.xmlb.annotations.XCollection
+import com.stackfilesync.intellij.model.PostSyncCommand
 
 @Tag("Repository")
 data class Repository(
@@ -26,7 +27,7 @@ data class Repository(
     
     @Tag("excludePatterns")
     @XCollection(style = XCollection.Style.v2)
-    var excludePatterns: List<String> = emptyList(),
+    var excludePatterns: List<String> = listOf("**/backend/**"),
     
     @Tag("autoSync")
     var autoSync: AutoSyncConfig? = null,
@@ -39,7 +40,7 @@ data class Repository(
     
     @Tag("postSyncCommands")
     @XCollection(style = XCollection.Style.v2)
-    var postSyncCommands: List<PostSyncCommand> = emptyList()
+    var postSyncCommands: List<PostSyncCommand> = listOf()
 )
 
 @Tag("AutoSyncConfig")
@@ -67,13 +68,4 @@ data class InternalSyncConfig(
     
     @Tag("networkPath")
     var networkPath: String = ""
-)
-
-@Tag("PostSyncCommand")
-data class PostSyncCommand(
-    @Tag("directory")
-    var directory: String = "",
-    
-    @Tag("command")
-    var command: String = ""
 ) 

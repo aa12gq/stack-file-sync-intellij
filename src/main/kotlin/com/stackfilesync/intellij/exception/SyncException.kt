@@ -11,7 +11,7 @@ sealed class SyncException(message: String, cause: Throwable? = null) : Exceptio
         SyncException("文件操作失败: $message", cause)
     
     class CommandException(message: String, cause: Throwable? = null) : 
-        SyncException("命令执行失败: $message", cause)
+        SyncException(message, cause)
     
     class ConfigException(message: String) : 
         SyncException("配置错误: $message")

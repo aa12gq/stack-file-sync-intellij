@@ -27,10 +27,14 @@ import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.Panel
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
+import javax.swing.DefaultListCellRenderer
+import javax.swing.JList
 
 class RepositorySettingsPanel(private val project: Project) {
     private var panel: DialogPanel? = null
     private var repository = Repository()
+    private lateinit var commandList: JBList<PostSyncCommand>
+    private lateinit var listModel: DefaultListModel<PostSyncCommand>
 
     fun createPanel(): JPanel {
         panel = panel {
@@ -204,24 +208,10 @@ class RepositorySettingsPanel(private val project: Project) {
                     """.trimIndent())
                 }
                 
-                lateinit var commandList: JBList<PostSyncCommand>
-                lateinit var listModel: DefaultListModel<PostSyncCommand>
-                
-                fun updateCommands() {
-                    val commands = mutableListOf<PostSyncCommand>()
-                    for (i in 0 until listModel.size) {
-                        commands.add(listModel.getElementAt(i))
-                    }
-                    repository.postSyncCommands = commands
-                }
-                
-                row {
-                    commandList = JBList()
-                    listModel = DefaultListModel()
-                    commandList.model = listModel
-                    
-                    // 设置渲染器
-                    commandList.cellRenderer = object : DefaultListCellRenderer() {
+                // 初始化命令列表
+                commandList = JBList<PostSyncCommand>().apply {
+                    model = DefaultListModel<PostSyncCommand>().also { listModel = it }
+                    cellRenderer = object : DefaultListCellRenderer() {
                         override fun getListCellRendererComponent(
                             list: JList<*>,
                             value: Any?,
@@ -235,65 +225,62 @@ class RepositorySettingsPanel(private val project: Project) {
                             return this
                         }
                     }
-                    
-                    // 初始化列表
-                    repository.postSyncCommands.forEach { command ->
-                        listModel.addElement(command)
-                    }
-                    
+                }
+                
+                // 加载现有命令
+                repository.postSyncCommands.forEach { command ->
+                    listModel.addElement(command)
+                }
+                
+                row {
                     cell(JBScrollPane(commandList))
                         .align(Align.FILL)
                         .resizableColumn()
                 }
                 
                 row {
-                    // 添加和删除按钮
                     button("添加命令") {
-                        val dialog = object : DialogWrapper(project, true) {
-                            private val directoryField = JBTextField()
-                            private val commandField = JBTextField()
+                        val dialog = object : DialogWrapper(project, false) {  // 改为 false
+                            private val directoryField = JBTextField().apply {
+                                preferredSize = Dimension(300, 30)  // 设置输入框大小
+                            }
+                            private val commandField = JBTextField().apply {
+                                preferredSize = Dimension(300, 30)
+                            }
                             
                             init {
                                 title = "添加后处理命令"
-                                init()
+                                isResizable = true  // 允许调整大小
+                                init()  // 必须最后调用
                             }
                             
                             override fun createCenterPanel(): JComponent {
-                                val dialogPanel = JPanel(BorderLayout())
-                                val content = panel {
-                                    row("目录:") {
-                                        cell(directoryField)
-                                            .comment("相对于项目根目录的路径，或绝对路径")
-                                            .focused()
-                                            .resizableColumn()
-                                            .align(Align.FILL)
-                                            .gap(RightGap.SMALL)
-                                    }
-                                    row("命令:") {
-                                        cell(commandField)
-                                            .comment("要执行的命令")
-                                            .resizableColumn()
-                                            .align(Align.FILL)
-                                            .gap(RightGap.SMALL)
-                                    }
-                                }
-
-                                // 将 Panel 转换为 JComponent 并添加到对话框面板
-                                (content as JComponent).apply {
+                                return JPanel(BorderLayout(10, 10)).apply {
                                     border = JBUI.Borders.empty(10)
-                                }.also { 
-                                    dialogPanel.add(it, BorderLayout.CENTER)
+                                    preferredSize = Dimension(400, 150)
+                                    
+                                    add(JPanel(BorderLayout(5, 5)).apply {
+                                        add(JLabel("目录:"), BorderLayout.WEST)
+                                        add(directoryField, BorderLayout.CENTER)
+                                    }, BorderLayout.NORTH)
+                                    
+                                    add(JPanel(BorderLayout(5, 5)).apply {
+                                        add(JLabel("命令:"), BorderLayout.WEST)
+                                        add(commandField, BorderLayout.CENTER)
+                                    }, BorderLayout.CENTER)
+                                    
+                                    add(JLabel("注意：目录路径可以是相对于项目根目录的路径，也可以是绝对路径"), 
+                                        BorderLayout.SOUTH)
                                 }
-
-                                dialogPanel.preferredSize = Dimension(400, 100)
-                                return dialogPanel
                             }
                             
+                            override fun getPreferredFocusedComponent() = directoryField
+                            
                             fun getCommand(): PostSyncCommand? {
-                                val dir = directoryField.text
-                                val cmd = commandField.text
+                                val dir = directoryField.text.trim()
+                                val cmd = commandField.text.trim()
                                 if (dir.isBlank() || cmd.isBlank()) return null
-                                return PostSyncCommand(dir, cmd)
+                                return PostSyncCommand(directory = dir, command = cmd)
                             }
                         }
                         
@@ -335,5 +322,15 @@ class RepositorySettingsPanel(private val project: Project) {
     fun setRepository(repo: Repository) {
         repository = repo.copy()
         panel?.reset()  // 重置面板以显示新的数据
+    }
+
+    // 更新命令列表到仓库对象
+    private fun updateCommands() {
+        val commands = mutableListOf<PostSyncCommand>()
+        for (i in 0 until listModel.size) {
+            commands.add(listModel.getElementAt(i))
+        }
+        repository.postSyncCommands = commands
+        panel?.apply()  // 应用更改到面板
     }
 } 
