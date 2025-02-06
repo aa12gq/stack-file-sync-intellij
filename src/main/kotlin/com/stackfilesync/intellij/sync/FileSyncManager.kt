@@ -264,7 +264,6 @@ class FileSyncManager(
     }
 
     private fun syncFiles(repository: Repository, sourcePath: Path) {
-        val startTime = System.currentTimeMillis()
         try {
             val targetDir = getTargetDirectory(repository)
             val sourceDir = sourcePath.resolve(repository.sourceDirectory)
@@ -278,7 +277,7 @@ class FileSyncManager(
                     1. 源目录路径是否正确
                     2. 仓库是否包含该目录
                 """.trimIndent()
-                NotificationUtils.showError(project, "同步失败", errorMessage)
+                showNotification("同步失败", errorMessage, true)
                 throw SyncException.FileException(errorMessage)
             }
             
@@ -287,33 +286,21 @@ class FileSyncManager(
             val files = findFilesToSync(sourceDir, repository)
             
             if (files.isEmpty()) {
-                val errorMessage = """
-                    未找到可同步的文件
-                    请检查:
-                    1. 文件匹配模式是否正确: ${repository.filePatterns ?: listOf("**/*.proto")}
-                    2. 源目录是否包含匹配的文件: ${repository.sourceDirectory}
-                    3. 文件是否被排除规则过滤: ${repository.excludePatterns}
-                """.trimIndent()
-                NotificationUtils.showError(project, "同步失败", errorMessage)
-                throw SyncException.FileException(errorMessage)
+                showNotification("同步成功", "已成功同步 0 个文件")
+                return
             }
 
-            // 让用户选择要同步的文件
-            val selectedFiles = chooseFilesToSync(files, sourceDir)
-            if (selectedFiles.isEmpty()) {
-                return // 用户取消了选择
-            }
-            
+            // 同步所有匹配的文件，不需要用户选择
             indicator.isIndeterminate = false
             indicator.fraction = 0.0
             
             // 备份现有文件
             indicator.text = "正在备份文件..."
-            backupSelectedFiles(repository, selectedFiles, targetDir)
+            backupSelectedFiles(repository, files, targetDir)
             
-            // 同步选中的文件
+            // 同步文件
             var successCount = 0
-            selectedFiles.forEachIndexed { index, file ->
+            files.forEachIndexed { index, file ->
                 try {
                     val relativePath = sourceDir.relativize(file)
                     val targetFile = targetDir.resolve(relativePath)
@@ -328,30 +315,22 @@ class FileSyncManager(
                     successCount++
                     
                     // 更新进度
-                    indicator.fraction = (index + 1).toDouble() / selectedFiles.size
-                    indicator.text = "正在同步: $relativePath (${index + 1}/${selectedFiles.size})"
+                    indicator.fraction = (index + 1).toDouble() / files.size
+                    indicator.text = "正在同步: $relativePath (${index + 1}/${files.size})"
                     
                 } catch (e: Exception) {
                     val errorMessage = "同步文件失败: ${file}, 原因: ${e.message}"
-                    NotificationUtils.showError(project, "同步失败", errorMessage)
+                    showNotification("同步失败", errorMessage, true)
                     throw SyncException.FileException(errorMessage, e)
                 }
             }
             
             // 显示成功通知
-            val duration = System.currentTimeMillis() - startTime
-            NotificationUtils.showInfo(
-                project,
-                "同步成功",
-                """
-                已同步 $successCount 个文件
-                耗时: ${duration / 1000.0} 秒
-                """.trimIndent()
-            )
+            showNotification("同步成功", "已成功同步 $successCount 个文件")
             
         } catch (e: Exception) {
             val errorMessage = "同步失败: ${e.message}"
-            NotificationUtils.showError(project, "同步失败", errorMessage)
+            showNotification("同步失败", errorMessage, true)
             throw SyncException.FileException(errorMessage, e)
         }
     }
