@@ -1,0 +1,99 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
+    <id>com.stackfilesync.intellij</id>
+
+    <!-- Public plugin name should be written in Title Case.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
+    <name>Stack File Sync</name>
+
+    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
+    <vendor>aa12gq</vendor>
+
+    <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
+         Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
+    <description><![CDATA[
+        一个解决团队协作中文件同步痛点的 IntelliJ 平台插件。特别适用于前后端协作场景，支持 Git 仓库同步和内网直接同步两种方式。
+        通过配置文件源和目标位置，可以一键完成文件同步，避免手动拷贝文件可能带来的遗漏和版本不一致问题。
+        
+        主要功能:
+        - 支持从多个 Git 仓库同步文件
+        - 支持文件模式匹配（使用 glob 语法）
+        - 支持排除特定文件或目录
+        - 同步前自动备份原文件
+        - 可配置目标同步目录
+        - 支持编译后处理（如 proto 文件编译）
+        - 支持自动同步功能，可设置同步时间间隔
+    ]]></description>
+
+    <!-- Product and plugin compatibility requirements.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>Git4Idea</depends>
+    <depends>com.intellij.modules.java</depends>
+
+    <!-- Extension points defined by the plugin.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- 工具窗口 -->
+        <toolWindow id="Stack File Sync" 
+                   secondary="true"
+                   icon="/icons/logo.svg"
+                   anchor="right"
+                   factoryClass="com.stackfilesync.intellij.window.SyncToolWindowFactory"/>
+                   
+        <!-- 持久化配置 -->
+        <applicationService 
+            serviceImplementation="com.stackfilesync.intellij.settings.SyncSettings"/>
+            
+        <!-- 配置界面 -->
+        <applicationConfigurable 
+            parentId="tools"
+            instance="com.stackfilesync.intellij.settings.SyncSettingsConfigurable"
+            id="com.stackfilesync.intellij.settings.SyncSettingsConfigurable"
+            displayName="Stack File Sync"/>
+        
+        <!-- 添加历史记录服务 -->
+        <applicationService 
+            serviceImplementation="com.stackfilesync.intellij.service.SyncHistoryService"/>
+        
+        <!-- 添加自动同步服务 -->
+        <projectService 
+            serviceImplementation="com.stackfilesync.intellij.sync.AutoSyncManager"/>
+        
+        <!-- 添加通知组 -->
+        <notificationGroup id="Stack File Sync"
+                          displayType="BALLOON"
+                          key="notification.group.name"/>
+    </extensions>
+
+    <actions>
+        <!-- 同步文件动作 -->
+        <action id="StackFileSync.SyncFiles" 
+                class="com.stackfilesync.intellij.actions.SyncFilesAction"
+                icon="/icons/sync.svg"
+                text="同步文件"
+                description="同步远程仓库文件">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt S"/>
+        </action>
+        
+        <!-- 配置同步动作 -->
+        <action id="StackFileSync.Configure"
+                class="com.stackfilesync.intellij.actions.ConfigureAction"
+                text="配置同步"
+                description="配置同步设置">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt COMMA"/>
+        </action>
+        
+        <!-- 添加自动同步动作 -->
+        <action id="StackFileSync.ToggleAutoSync"
+                class="com.stackfilesync.intellij.actions.ToggleAutoSyncAction"
+                text="切换自动同步"
+                description="启用/禁用自动同步">
+            <add-to-group group-id="StackFileSync.RepositoryActions" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>

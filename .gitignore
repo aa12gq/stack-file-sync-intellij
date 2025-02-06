@@ -40,7 +40,6 @@ bin/
 
 ### Mac OS ###
 .DS_Store
-# Project exclude paths
-/.run/
-/gradle/
-/src/
+
+# 备份文件
+.stack-file-sync/
