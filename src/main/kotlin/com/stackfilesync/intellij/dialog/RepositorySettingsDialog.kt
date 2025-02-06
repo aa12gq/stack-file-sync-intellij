@@ -8,21 +8,19 @@ import javax.swing.JComponent
 
 class RepositorySettingsDialog(
     project: Project,
-    private val repository: Repository
+    repository: Repository
 ) : DialogWrapper(project) {
     private val panel = RepositorySettingsPanel(project)
     
     init {
         title = "仓库设置"
+        panel.setRepository(repository.copy())
         init()
-        panel.setRepository(repository)
     }
     
     override fun createCenterPanel(): JComponent {
         return panel.createPanel()
     }
     
-    fun getRepository(): Repository {
-        return panel.getRepository()
-    }
+    fun getRepository(): Repository = panel.getRepository()
 } 

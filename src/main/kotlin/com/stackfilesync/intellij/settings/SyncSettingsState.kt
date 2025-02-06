@@ -2,37 +2,39 @@ package com.stackfilesync.intellij.settings
 
 import com.intellij.openapi.components.*
 import com.stackfilesync.intellij.model.Repository
+import com.intellij.util.xmlb.annotations.Tag
+import com.intellij.util.xmlb.annotations.XCollection
+import com.intellij.util.xmlb.XmlSerializerUtil
 
 @State(
     name = "StackFileSyncSettings",
     storages = [Storage("stackFileSync.xml")]
 )
-class SyncSettingsState : PersistentStateComponent<SyncSettingsState.State> {
-    
-    data class State(
-        var repositories: MutableList<Repository> = mutableListOf(),
-        var backupEnabled: Boolean = true
-    )
+class SyncSettingsState : PersistentStateComponent<SyncSettingsState> {
+    @Tag("repositories")
+    @XCollection(style = XCollection.Style.v2)
+    var repositoryList: MutableList<Repository> = mutableListOf()
 
-    private var myState = State()
+    @Tag("backupEnabled")
+    var backupEnabledFlag: Boolean = true
 
-    override fun getState(): State = myState
+    override fun getState(): SyncSettingsState = this
 
-    override fun loadState(state: State) {
-        myState = state
+    override fun loadState(state: SyncSettingsState) {
+        XmlSerializerUtil.copyBean(state, this)
     }
 
-    fun getRepositories(): List<Repository> = myState.repositories
+    fun getRepositories(): List<Repository> = repositoryList.toList()
 
     fun setRepositories(repositories: List<Repository>) {
-        myState.repositories.clear()
-        myState.repositories.addAll(repositories)
+        repositoryList.clear()
+        repositoryList.addAll(repositories.map { it.copy() })
     }
 
-    fun isBackupEnabled(): Boolean = myState.backupEnabled
+    fun getBackupEnabled(): Boolean = backupEnabledFlag
 
     fun setBackupEnabled(enabled: Boolean) {
-        myState.backupEnabled = enabled
+        backupEnabledFlag = enabled
     }
 
     companion object {

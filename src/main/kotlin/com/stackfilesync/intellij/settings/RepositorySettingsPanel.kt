@@ -29,7 +29,7 @@ import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
 
 class RepositorySettingsPanel(private val project: Project) {
-    private lateinit var panel: DialogPanel
+    private var panel: DialogPanel? = null
     private var repository = Repository()
 
     fun createPanel(): JPanel {
@@ -37,7 +37,8 @@ class RepositorySettingsPanel(private val project: Project) {
             group("基本设置") {
                 row("仓库名称:") {
                     textField()
-                        .bindText(repository::name)
+                        .bindText({ repository.name }, { repository.name = it })
+                        .focused()  // 让名称输入框获得焦点
                         .validationOnInput {
                             if (it.text.isBlank()) error("仓库名称不能为空") else null
                         }
@@ -45,7 +46,7 @@ class RepositorySettingsPanel(private val project: Project) {
                 
                 row("Git仓库URL:") {
                     textField()
-                        .bindText(repository::url)
+                        .bindText({ repository.url }, { repository.url = it })
                         .validationOnInput {
                             if (it.text.isBlank()) error("Git仓库URL不能为空") else null
                         }
@@ -53,7 +54,7 @@ class RepositorySettingsPanel(private val project: Project) {
                 
                 row("分支:") {
                     textField()
-                        .bindText(repository::branch)
+                        .bindText({ repository.branch }, { repository.branch = it })
                         .validationOnInput {
                             if (it.text.isBlank()) error("分支不能为空") else null
                         }
@@ -63,7 +64,7 @@ class RepositorySettingsPanel(private val project: Project) {
             group("目录设置") {
                 row("源目录:") {
                     textField()
-                        .bindText(repository::sourceDirectory)
+                        .bindText({ repository.sourceDirectory }, { repository.sourceDirectory = it })
                         .validationOnInput {
                             if (it.text.isBlank()) error("源目录不能为空") else null
                         }
@@ -71,7 +72,7 @@ class RepositorySettingsPanel(private val project: Project) {
                 
                 row("目标目录:") {
                     textField()
-                        .bindText(repository::targetDirectory)
+                        .bindText({ repository.targetDirectory }, { repository.targetDirectory = it })
                         .validationOnInput {
                             if (it.text.isBlank()) error("目标目录不能为空") else null
                         }
@@ -315,12 +316,13 @@ class RepositorySettingsPanel(private val project: Project) {
             }
         }
         
-        return panel
+        return panel!!
     }
 
     fun getRepository(): Repository = repository
+
     fun setRepository(repo: Repository) {
-        repository = repo
-        panel.reset()
+        repository = repo.copy()
+        panel?.reset()  // 重置面板以显示新的数据
     }
 } 
