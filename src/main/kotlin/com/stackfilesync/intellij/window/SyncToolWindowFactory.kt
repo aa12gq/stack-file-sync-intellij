@@ -15,6 +15,9 @@ import javax.swing.JLabel
 import javax.swing.JComponent
 import java.awt.BorderLayout
 import java.awt.Dimension
+import javax.swing.JButton
+import javax.swing.BorderFactory
+import com.intellij.icons.AllIcons
 
 class SyncToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
@@ -30,9 +33,21 @@ class SyncToolWindowFactory : ToolWindowFactory {
         }
         logService.setConsoleView(consoleView)
         
+        // 创建日志面板的标题栏
+        val logTitlePanel = JPanel(BorderLayout()).apply {
+            add(JLabel("同步日志"), BorderLayout.WEST)
+            add(JButton(AllIcons.Actions.GC).apply {  // 使用垃圾桶图标
+                toolTipText = "清除日志"
+                addActionListener {
+                    logService.clear()
+                }
+            }, BorderLayout.EAST)
+            border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
+        }
+        
         // 创建一个带标题的日志面板
         val logPanel = JPanel(BorderLayout()).apply {
-            add(JLabel("同步日志"), BorderLayout.NORTH)
+            add(logTitlePanel, BorderLayout.NORTH)
             add(JBScrollPane(consoleView.component), BorderLayout.CENTER)
         }
         

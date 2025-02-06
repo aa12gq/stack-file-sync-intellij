@@ -9,6 +9,7 @@ import com.stackfilesync.intellij.sync.FileSyncManager
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.application.invokeLater
 import javax.swing.JPanel
 import java.awt.BorderLayout
 import javax.swing.JButton
@@ -30,6 +31,8 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
         selectionMode = ListSelectionModel.SINGLE_SELECTION
         cellRenderer = RepositoryListCellRenderer()
     }
+    private var isSyncing = false
+    private lateinit var syncButton: JButton
 
     init {
         // 创建顶部工具栏
@@ -55,17 +58,21 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
 
         // 创建底部操作按钮
+        syncButton = JButton("同步").apply {
+            addActionListener {
+                if (!isSyncing) {
+                    val selected = repositoryList.selectedValue
+                    if (selected != null) {
+                        startSync(selected)
+                    }
+                }
+            }
+        }
+        
         val buttonPanel = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.X_AXIS)
             add(Box.createHorizontalGlue())
-            add(JButton("同步").apply {
-                addActionListener {
-                    val selected = repositoryList.selectedValue
-                    if (selected != null) {
-                        syncRepository(selected)
-                    }
-                }
-            })
+            add(syncButton)
             border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
         }
 
@@ -93,11 +100,23 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
         loadRepositories()
     }
 
-    private fun syncRepository(repository: Repository) {
+    private fun startSync(repository: Repository) {
+        isSyncing = true
+        syncButton.isEnabled = false
+        syncButton.text = "同步中..."
+
         ProgressManager.getInstance().run(
             object : Task.Backgroundable(project, "同步文件", false) {
                 override fun run(indicator: ProgressIndicator) {
-                    FileSyncManager(project, indicator).sync(repository)
+                    try {
+                        FileSyncManager(project, indicator).sync(repository)
+                    } finally {
+                        invokeLater {
+                            isSyncing = false
+                            syncButton.isEnabled = true
+                            syncButton.text = "同步"
+                        }
+                    }
                 }
             }
         )
