@@ -8,12 +8,14 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import com.stackfilesync.intellij.exception.SyncException
 import com.stackfilesync.intellij.model.Repository
-import com.stackfilesync.intellij.util.FilePatternMatcher
+import com.stackfilesync.intellij.utils.FilePatternMatcher
 import java.util.zip.ZipOutputStream
 import java.util.zip.ZipEntry
 import java.io.File
 import java.time.ZoneId
 import java.security.MessageDigest
+import java.util.stream.Collectors
+import java.util.Comparator
 
 class BackupManager(private val project: Project) {
     private val backupRoot = getBackupDirectory()
@@ -61,9 +63,24 @@ class BackupManager(private val project: Project) {
         }
     }
     
-    fun cleanOldBackups(repository: Repository) {
-        val maxBackups = repository.backupConfig?.maxBackups ?: 10
-        cleanOldBackups(maxBackups)
+    fun cleanOldBackups(maxBackups: Int) {
+        try {
+            val backups = Files.list(backupRoot)
+                .filter { Files.isDirectory(it) }
+                .sorted { a, b -> b.fileName.toString().compareTo(a.fileName.toString()) }
+                .collect(Collectors.toList())
+            
+            if (backups.size > maxBackups) {
+                backups.subList(maxBackups, backups.size).forEach { backup ->
+                    Files.walk(backup)
+                        .sorted(Comparator.reverseOrder())
+                        .forEach { Files.delete(it) }
+                }
+            }
+        } catch (e: Exception) {
+            // 清理失败不影响主流程，只记录错误
+            e.printStackTrace()
+        }
     }
     
     private fun getBackupDirectory(): Path {
@@ -281,11 +298,9 @@ class BackupManager(private val project: Project) {
     private fun getBackupFiles(backupPath: Path): Map<String, ByteArray> {
         return Files.walk(backupPath)
             .filter { Files.isRegularFile(it) }
-            .associate { file ->
-                val relativePath = backupPath.relativize(file).toString()
-                val hash = MessageDigest.getInstance("MD5")
-                    .digest(Files.readAllBytes(file))
-                relativePath to hash
-            }
+            .collect(Collectors.toMap(
+                { file -> backupPath.relativize(file).toString() },
+                { file -> MessageDigest.getInstance("MD5").digest(Files.readAllBytes(file)) }
+            ))
     }
 } 

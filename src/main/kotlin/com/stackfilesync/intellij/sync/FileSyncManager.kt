@@ -39,11 +39,7 @@ class FileSyncManager(
             indicator.text = "准备同步..."
             indicator.isIndeterminate = true
             
-            if (repository.internalSync?.enabled == true) {
-                syncFromInternalNetwork(repository)
-            } else {
-                syncFromGit(repository)
-            }
+            syncFromGit(repository)
             
             // 执行后处理命令
             executePostSyncCommands(repository)
@@ -91,17 +87,11 @@ class FileSyncManager(
             throw SyncException.ConfigException("仓库名称不能为空")
         }
         
-        if (!repository.internalSync?.enabled!!) {
-            if (repository.url.isBlank()) {
-                throw SyncException.ConfigException("Git仓库URL不能为空")
-            }
-            if (repository.branch.isBlank()) {
-                throw SyncException.ConfigException("Git分支不能为空")
-            }
-        } else {
-            if (repository.internalSync?.networkPath.isNullOrBlank()) {
-                throw SyncException.ConfigException("内网同步路径不能为空")
-            }
+        if (repository.url.isBlank()) {
+            throw SyncException.ConfigException("Git仓库URL不能为空")
+        }
+        if (repository.branch.isBlank()) {
+            throw SyncException.ConfigException("Git分支不能为空")
         }
         
         if (repository.sourceDirectory.isBlank()) {
@@ -125,19 +115,6 @@ class FileSyncManager(
         // 同步文件
         indicator.text = "同步文件..."
         syncFiles(repository, gitDir)
-    }
-
-    private fun syncFromInternalNetwork(repository: Repository) {
-        indicator.text = "从内网同步文件..."
-        val sourcePath = repository.internalSync?.networkPath ?: return
-        val sourceFile = File(sourcePath)
-        
-        if (!sourceFile.exists()) {
-            throw RuntimeException("无法访问内网路径: $sourcePath")
-        }
-
-        // 同步文件
-        syncFiles(repository, sourceFile.toPath())
     }
 
     private fun cloneRepository(repository: Repository, gitDir: Path) {
@@ -217,7 +194,8 @@ class FileSyncManager(
             }
             
             // 清理旧备份
-            backupManager.cleanOldBackups()
+            val maxBackups = repository.backupConfig?.maxBackups ?: 10
+            backupManager.cleanOldBackups(maxBackups)
             
         } catch (e: Exception) {
             throw SyncException.FileException("同步文件失败", e)

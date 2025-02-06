@@ -8,7 +8,7 @@
     <name>Stack File Sync</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-    <vendor>aa12gq</vendor>
+    <vendor>your-vendor-name</vendor>
 
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
@@ -26,6 +26,15 @@
         - 支持编译后处理（如 proto 文件编译）
         - 支持自动同步功能，可设置同步时间间隔
     ]]></description>
+
+    <!-- Change notes for the plugin. -->
+    <change-notes><![CDATA[
+        Initial release:
+        - Basic file synchronization
+        - Auto sync support
+        - Backup functionality
+        - UI components
+    ]]></change-notes>
 
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->

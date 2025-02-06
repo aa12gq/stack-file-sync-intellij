@@ -17,9 +17,11 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import javax.swing.filechooser.FileNameExtensionFilter
+import javax.swing.event.DocumentEvent
+import javax.swing.event.DocumentListener
 
 class BackupBrowserDialog(
-    project: Project,
+    private val project: Project,
     private val repository: Repository
 ) : DialogWrapper(project) {
     
@@ -42,10 +44,10 @@ class BackupBrowserDialog(
         loadBackups()
         
         // 添加搜索监听
-        searchField.addDocumentListener(object : DocumentAdapter() {
-            override fun textChanged(e: DocumentEvent) {
-                filterBackups()
-            }
+        searchField.addDocumentListener(object : DocumentListener {
+            override fun insertUpdate(e: DocumentEvent) = filterBackups()
+            override fun removeUpdate(e: DocumentEvent) = filterBackups()
+            override fun changedUpdate(e: DocumentEvent) = filterBackups()
         })
     }
     
@@ -190,7 +192,7 @@ class BackupBrowserDialog(
         
         if (fileChooser.showSaveDialog(contentPanel) == JFileChooser.APPROVE_OPTION) {
             try {
-                val targetFile = fileChooser.selectedFile
+                var targetFile = fileChooser.selectedFile
                 if (!targetFile.name.lowercase().endsWith(".zip")) {
                     targetFile = File(targetFile.parentFile, "${targetFile.name}.zip")
                 }

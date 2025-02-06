@@ -11,12 +11,23 @@ import com.stackfilesync.intellij.settings.SyncSettings
 import javax.swing.*
 import javax.swing.table.AbstractTableModel
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.DataManager
 import javax.swing.table.DefaultTableCellRenderer
 import java.awt.Component
 import com.stackfilesync.intellij.dialog.BackupBrowserDialog
+import com.intellij.ui.JBColor
+import com.intellij.icons.AllIcons
+import com.stackfilesync.intellij.icons.StackFileSync
+import com.intellij.util.ui.UIUtil
+import com.intellij.openapi.actionSystem.Presentation
+import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext
+import com.intellij.openapi.actionSystem.DataKey
 
 class RepositoriesPanel(private val project: Project) : JPanel() {
+    companion object {
+        private val REPOSITORY_KEY = DataKey.create<Repository>("repository")
+    }
+
     private val table: JBTable
     private val tableModel: RepositoriesTableModel
     
@@ -50,13 +61,13 @@ class RepositoriesPanel(private val project: Project) : JPanel() {
         
         // 设置表格样式
         table.apply {
-            gridColor = JBUI.CurrentTheme.Table.gridColor()
+            gridColor = JBColor.border()
             rowHeight = JBUI.scale(24)
             intercellSpacing = JBUI.size(1)
             
             // 设置选择样式
-            selectionBackground = JBUI.CurrentTheme.Table.selectionBackground()
-            selectionForeground = JBUI.CurrentTheme.Table.selectionForeground()
+            selectionBackground = UIUtil.getTableSelectionBackground(true)
+            selectionForeground = UIUtil.getTableSelectionForeground(true)
         }
         
         // 加载数据
@@ -112,7 +123,19 @@ class RepositoriesPanel(private val project: Project) : JPanel() {
                     val selectedRow = table.selectedRow
                     if (selectedRow >= 0) {
                         val repo = tableModel.repositories[selectedRow]
-                        // 执行同步
+                        ActionManager.getInstance()
+                            .getAction("StackFileSync.SyncFiles")
+                            .actionPerformed(AnActionEvent(
+                                null,
+                                SimpleDataContext.builder()
+                                    .add(CommonDataKeys.PROJECT, project)
+                                    .add(REPOSITORY_KEY, repo)
+                                    .build(),
+                                "StackFileSync",
+                                Presentation(),
+                                ActionManager.getInstance(),
+                                0
+                            ))
                     }
                 }
             })
@@ -124,16 +147,25 @@ class RepositoriesPanel(private val project: Project) : JPanel() {
                     val selectedRow = table.selectedRow
                     if (selectedRow >= 0) {
                         val repo = tableModel.repositories[selectedRow]
-                        // 切换自动同步状态
-                        ActionManager.getInstance()
+                        val action = ActionManager.getInstance()
                             .getAction("StackFileSync.ToggleAutoSync")
-                            .actionPerformed(
-                                AnActionEvent.createFromDataContext(
-                                    "",
-                                    null,
-                                    DataManager.getInstance().getDataContext(this@RepositoriesPanel)
-                                )
-                            )
+                        
+                        val dataContext = SimpleDataContext.builder()
+                            .add(CommonDataKeys.PROJECT, project)
+                            .add(REPOSITORY_KEY, repo)
+                            .build()
+                        
+                        val event = AnActionEvent(
+                            null,
+                            dataContext,
+                            "StackFileSync",
+                            Presentation(),
+                            ActionManager.getInstance(),
+                            0
+                        )
+                        
+                        action.actionPerformed(event)
+                        tableModel.fireTableDataChanged()
                     }
                 }
             })

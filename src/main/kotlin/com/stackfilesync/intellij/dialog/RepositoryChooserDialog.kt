@@ -6,6 +6,7 @@ import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.stackfilesync.intellij.model.Repository
 import javax.swing.*
+import java.awt.Component
 
 class RepositoryChooserDialog(
     project: Project,

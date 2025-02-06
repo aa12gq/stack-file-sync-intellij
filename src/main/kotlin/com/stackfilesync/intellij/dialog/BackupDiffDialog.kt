@@ -9,6 +9,10 @@ import com.stackfilesync.intellij.backup.BackupManager
 import java.awt.BorderLayout
 import java.time.format.DateTimeFormatter
 import javax.swing.*
+import java.awt.Component
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
+import com.intellij.icons.AllIcons
 
 class BackupDiffDialog(
     project: Project,

@@ -1,6 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-    <g fill="none" fill-rule="evenodd">
-        <path d="M8 1.5c3.59 0 6.5 2.91 6.5 6.5s-2.91 6.5-6.5 6.5S1.5 11.59 1.5 8 4.41 1.5 8 1.5z" stroke="#6E6E6E"/>
-        <path d="M8 4v4l3 3" stroke="#6E6E6E" stroke-linecap="round"/>
-    </g>
+    <path fill="#6E6E6E" d="M8,1L2,4v8l6,3l6-3V4L8,1z M8,14l-5-2.5V5l5,2.5V14z M8,6.5L3,4l5-2.5L13,4L8,6.5z M13,11.5L8,14V7.5l5-2.5V11.5z"/>
 </svg> 
