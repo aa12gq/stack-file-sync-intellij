@@ -21,8 +21,8 @@ class BackupManager(private val project: Project) {
     private val backupRoot = getBackupDirectory()
     
     fun backupFiles(repository: Repository, files: List<Path>) {
-        // 检查是否启用备份
-        if (repository.backupConfig?.enabled != true) {
+        // 如果备份被禁用，直接返回
+        if (repository.backupConfig?.enabled == false) {
             return
         }
         
@@ -32,21 +32,8 @@ class BackupManager(private val project: Project) {
             val backupDir = backupRoot.resolve("${repository.name}_$timestamp")
             Files.createDirectories(backupDir)
             
-            // 过滤排除的文件
-            val excludePatterns = repository.backupConfig?.excludePatterns ?: emptyList()
-            val filesToBackup = if (excludePatterns.isEmpty()) {
-                files
-            } else {
-                files.filter { file ->
-                    val relativePath = getTargetDirectory(repository).relativize(file).toString()
-                    !excludePatterns.any { pattern ->
-                        FilePatternMatcher.matches(pattern, relativePath)
-                    }
-                }
-            }
-            
             // 备份文件
-            filesToBackup.forEach { file ->
+            files.forEach { file ->
                 if (Files.exists(file)) {
                     val relativePath = getTargetDirectory(repository).relativize(file)
                     val backupFile = backupDir.resolve(relativePath)

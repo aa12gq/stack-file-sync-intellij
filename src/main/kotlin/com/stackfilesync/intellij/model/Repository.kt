@@ -1,32 +1,20 @@
 package com.stackfilesync.intellij.model
 
+import com.stackfilesync.intellij.model.AutoSyncConfig
+import com.stackfilesync.intellij.model.BackupConfig
+import com.stackfilesync.intellij.model.InternalSyncConfig
+import com.stackfilesync.intellij.model.PostSyncCommand
+
 data class Repository(
     var name: String = "",
     var url: String = "",
-    var branch: String = "master",
+    var branch: String = "main",
     var sourceDirectory: String = "",
     var targetDirectory: String = "",
-    var filePatterns: List<String> = listOf(),
-    var excludePatterns: List<String> = listOf(),
-    var postSyncCommands: List<PostSyncCommand> = emptyList(),
+    var filePatterns: List<String> = listOf("**/*.proto"),
+    var excludePatterns: List<String> = listOf("**/backend/**"),
     var autoSync: AutoSyncConfig? = null,
-    var backupConfig: BackupConfig? = null
-) {
-    data class PostSyncCommand(
-        var directory: String = "",
-        var command: String = ""
-    )
-
-    data class AutoSyncConfig(
-        var enabled: Boolean = false,
-        var interval: Int = 300
-    )
-
-    data class BackupConfig(
-        var enabled: Boolean = true,
-        var maxBackups: Int = 10,
-        var backupBeforeSync: Boolean = true,
-        var backupBeforeRestore: Boolean = true,
-        var excludePatterns: List<String> = listOf()
-    )
-} 
+    var postSyncCommands: List<PostSyncCommand> = emptyList(),
+    var backupConfig: BackupConfig? = BackupConfig(),
+    var internalSync: InternalSyncConfig? = null
+) 

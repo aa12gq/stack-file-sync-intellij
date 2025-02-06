@@ -7,24 +7,70 @@
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
     <name>Stack File Sync</name>
 
-    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-    <vendor>your-vendor-name</vendor>
+    <!-- 修改供应商信息 -->
+    <vendor email="aa12gq@gmail.com" url="https://github.com/aa12gq">aa12gq</vendor>
 
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
     <description><![CDATA[
-        一个解决团队协作中文件同步痛点的 IntelliJ 平台插件。特别适用于前后端协作场景，支持 Git 仓库同步和内网直接同步两种方式。
-        通过配置文件源和目标位置，可以一键完成文件同步，避免手动拷贝文件可能带来的遗漏和版本不一致问题。
+        一个解决团队协作中文件同步痛点的 IntelliJ 平台插件。特别适用于前后端协作场景，支持 Git 仓库同步。
         
-        主要功能:
-        - 支持从多个 Git 仓库同步文件
-        - 支持文件模式匹配（使用 glob 语法）
-        - 支持排除特定文件或目录
-        - 同步前自动备份原文件
-        - 可配置目标同步目录
-        - 支持编译后处理（如 proto 文件编译）
-        - 支持自动同步功能，可设置同步时间间隔
+        <h2>主要功能</h2>
+        <ul>
+            <li>支持从多个 Git 仓库同步文件</li>
+            <li>支持文件模式匹配（使用 glob 语法）</li>
+            <li>支持排除特定文件或目录</li>
+            <li>同步前自动备份原文件</li>
+            <li>可配置目标同步目录</li>
+            <li>支持编译后处理（如 proto 文件编译）</li>
+            <li>支持自动同步功能，可设置同步时间间隔</li>
+        </ul>
+        
+        <h2>使用说明</h2>
+        <ol>
+            <li><b>初始配置</b>
+                <ul>
+                    <li>打开 Settings -> Tools -> Stack File Sync</li>
+                    <li>点击 "+" 添加新的同步仓库</li>
+                    <li>填写仓库信息：名称、Git URL、分支等</li>
+                    <li>配置源目录和目标目录</li>
+                    <li>添加文件匹配模式（如 *.proto）</li>
+                </ul>
+            </li>
+            <li><b>同步文件</b>
+                <ul>
+                    <li>方式一：使用工具窗口
+                        <ul>
+                            <li>打开右侧 Stack File Sync 工具窗口</li>
+                            <li>选择仓库，点击同步按钮</li>
+                        </ul>
+                    </li>
+                    <li>方式二：使用快捷键
+                        <ul>
+                            <li>使用 Ctrl+Alt+S (Windows/Linux) 或 ⌘⌥S (Mac) 触发同步</li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
+            <li><b>自动同步</b>
+                <ul>
+                    <li>在工具窗口中右键点击仓库</li>
+                    <li>选择"启用自动同步"</li>
+                    <li>默认每5分钟自动同步一次</li>
+                </ul>
+            </li>
+            <li><b>查看备份</b>
+                <ul>
+                    <li>在工具窗口中右键点击仓库</li>
+                    <li>选择"浏览备份历史"</li>
+                    <li>可以查看、恢复或比较备份</li>
+                </ul>
+            </li>
+        </ol>
+        
+        <h2>更多帮助</h2>
+        <p>访问 <a href="https://github.com/aa12gq/stack-file-sync-intellij">项目主页</a> 获取更多信息和帮助。</p>
     ]]></description>
 
     <!-- Change notes for the plugin. -->

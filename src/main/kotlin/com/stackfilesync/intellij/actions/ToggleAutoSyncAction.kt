@@ -2,44 +2,33 @@ package com.stackfilesync.intellij.actions
 
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.DataKey
+import com.stackfilesync.intellij.service.RepositoryService
+import com.stackfilesync.intellij.utils.NotificationUtils
+import com.stackfilesync.intellij.model.AutoSyncConfig
 import com.stackfilesync.intellij.model.Repository
-import com.stackfilesync.intellij.model.Repository.AutoSyncConfig
-import com.stackfilesync.intellij.icons.StackFileSync
 
 class ToggleAutoSyncAction : AnAction() {
-    companion object {
-        val REPOSITORY_KEY = DataKey.create<Repository>("repository")
-    }
-
     override fun actionPerformed(e: AnActionEvent) {
-        val repository = e.getData(REPOSITORY_KEY) ?: return
+        val project = e.project ?: return
+        val repository = RepositoryService.getInstance(project).getRepository() ?: return
         
-        repository.autoSync = if (repository.autoSync?.enabled == true) {
-            null
-        } else {
+        // 切换自动同步状态
+        val isEnabled = repository.autoSync?.enabled ?: false
+        repository.autoSync = if (!isEnabled) {
             AutoSyncConfig(enabled = true)
-        }
-        
-        e.presentation.icon = if (repository.autoSync?.enabled == true) {
-            StackFileSync.AutoSync
         } else {
-            StackFileSync.AutoSyncDisabled
+            null
         }
-    }
-
-    override fun update(e: AnActionEvent) {
-        val repository = e.getData(REPOSITORY_KEY)
-        e.presentation.isEnabled = repository != null
         
-        if (repository != null) {
-            val enabled = repository.autoSync?.enabled ?: false
-            e.presentation.text = if (enabled) "禁用自动同步" else "启用自动同步"
-            e.presentation.icon = if (enabled) {
-                StackFileSync.AutoSync
-            } else {
-                StackFileSync.AutoSyncDisabled
-            }
+        // 保存配置
+        RepositoryService.getInstance(project).saveRepository(repository)
+        
+        // 显示通知
+        val message = if (repository.autoSync?.enabled == true) {
+            "已启用自动同步"
+        } else {
+            "已禁用自动同步"
         }
+        NotificationUtils.showInfo(project, "自动同步", message)
     }
 } 

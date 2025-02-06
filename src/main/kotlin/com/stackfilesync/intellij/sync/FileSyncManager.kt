@@ -18,6 +18,13 @@ import com.stackfilesync.intellij.service.SyncHistoryService
 import com.stackfilesync.intellij.exception.SyncException
 import com.stackfilesync.intellij.utils.NotificationUtils
 import com.stackfilesync.intellij.backup.BackupManager
+import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.ui.CheckBoxList
+import com.intellij.ui.components.JBScrollPane
+import javax.swing.JComponent
+import java.awt.Dimension
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.invokeLater
 
 class FileSyncManager(
     private val project: Project,
@@ -103,46 +110,101 @@ class FileSyncManager(
     }
 
     private fun syncFromGit(repository: Repository) {
-        // 克隆仓库
-        indicator.text = "克隆仓库..."
-        val gitDir = tempDir.resolve(repository.name)
-        cloneRepository(repository, gitDir)
-
-        // 切换分支
-        indicator.text = "切换分支..."
-        checkoutBranch(repository, gitDir)
-
-        // 同步文件
-        indicator.text = "同步文件..."
-        syncFiles(repository, gitDir)
+        try {
+            val gitDir = tempDir.resolve(repository.name)
+            
+            // 克隆仓库
+            cloneRepository(repository, gitDir)
+            
+            // 同步文件
+            syncFiles(repository, gitDir)
+            
+        } catch (e: Exception) {
+            val errorMessage = when (e) {
+                is SyncException -> e.message
+                else -> "同步失败: ${e.message}"
+            }
+            
+            NotificationUtils.showError(
+                project,
+                "同步失败",
+                errorMessage ?: "未知错误"
+            )
+            
+            throw e
+        }
     }
 
     private fun cloneRepository(repository: Repository, gitDir: Path) {
         try {
+            indicator.text = "正在克隆仓库: ${repository.url}..."
+            
+            // 先删除目标目录如果存在的话
+            if (Files.exists(gitDir)) {
+                gitDir.toFile().deleteRecursively()
+            }
+            
+            // 创建父目录
+            Files.createDirectories(gitDir.parent)
+            
             val handler = GitLineHandler(
                 project,
-                gitDir.toFile(),
+                gitDir.parent.toFile(), // 使用父目录作为工作目录
                 GitCommand.CLONE
             )
+            
+            // 参照VSCode插件的克隆参数，移除重复的"clone"命令
             handler.addParameters(
-                "--depth", "1",
-                "--filter=blob:none",
-                "--no-checkout",
+                "--quiet",  // 减少输出
+                "--single-branch",  // 只克隆单个分支
+                "--branch", repository.branch,  // 指定分支
+                "--depth=1",  // 浅克隆
                 repository.url,
                 gitDir.toString()
             )
             
-            git.runCommand(handler).throwOnError()
+            val result = git.runCommand(handler)
+            
+            if (result.exitCode != 0) {
+                val errorMessage = """
+                    同步失败: 克隆仓库失败
+                    仓库: ${repository.url}
+                    分支: ${repository.branch}
+                    错误信息: ${result.errorOutput}
+                """.trimIndent()
+                
+                NotificationUtils.showError(
+                    project,
+                    "同步失败",
+                    errorMessage
+                )
+                
+                throw SyncException.GitException(errorMessage)
+            }
+            
         } catch (e: Exception) {
-            throw SyncException.GitException(
-                "克隆仓库失败: ${repository.url}",
-                e
+            val errorMessage = """
+                同步失败: 克隆仓库失败
+                仓库: ${repository.url}
+                分支: ${repository.branch}
+                错误信息: ${e.message}
+            """.trimIndent()
+            
+            NotificationUtils.showError(
+                project,
+                "同步失败",
+                errorMessage
             )
+            
+            throw SyncException.GitException(errorMessage, e)
         }
     }
 
     private fun checkoutBranch(repository: Repository, gitDir: Path) {
         try {
+            // 添加日志输出
+            indicator.text = "正在切换到分支: ${repository.branch}..."
+            
             val handler = GitLineHandler(
                 project,
                 gitDir.toFile(),
@@ -150,55 +212,202 @@ class FileSyncManager(
             )
             handler.addParameters(repository.branch)
             
-            git.runCommand(handler).throwOnError()
+            // 执行Git命令
+            val result = git.runCommand(handler)
+            
+            // 检查命令执行结果
+            if (result.exitCode != 0) {
+                // 获取详细错误信息
+                val errorOutput = result.errorOutput
+                val errorMessage = """
+                    Git操作失败: 切换分支失败: ${repository.branch}
+                    错误信息: ${errorOutput}
+                    
+                    请检查:
+                    1. 分支名称是否正确
+                    2. 分支是否存在
+                    3. 是否有权限访问该分支
+                    4. 远程仓库连接是否正常
+                """.trimIndent()
+                
+                // 显示错误通知
+                NotificationUtils.showError(
+                    project,
+                    "切换分支失败",
+                    errorMessage
+                )
+                
+                throw SyncException.GitException(errorMessage)
+            }
+            
         } catch (e: Exception) {
-            throw SyncException.GitException(
-                "切换分支失败: ${repository.branch}",
-                e
+            val errorMessage = """
+                Git操作失败: 切换分支失败: ${repository.branch}
+                错误信息: ${e.message}
+                
+                请检查:
+                1. 分支名称是否正确
+                2. 分支是否存在
+                3. 是否有权限访问该分支
+                4. 远程仓库连接是否正常
+            """.trimIndent()
+            
+            // 显示错误通知
+            NotificationUtils.showError(
+                project,
+                "切换分支失败",
+                errorMessage
             )
+            
+            throw SyncException.GitException(errorMessage, e)
         }
     }
 
     private fun syncFiles(repository: Repository, sourcePath: Path) {
+        val startTime = System.currentTimeMillis()
         try {
             val targetDir = getTargetDirectory(repository)
             val sourceDir = sourcePath.resolve(repository.sourceDirectory)
             
+            // 检查源目录是否存在
+            if (!Files.exists(sourceDir)) {
+                val errorMessage = """
+                    未找到源目录
+                    目录: ${sourceDir}
+                    请检查:
+                    1. 源目录路径是否正确
+                    2. 仓库是否包含该目录
+                """.trimIndent()
+                NotificationUtils.showError(project, "同步失败", errorMessage)
+                throw SyncException.FileException(errorMessage)
+            }
+            
             // 获取要同步的文件
+            indicator.text = "正在扫描文件..."
             val files = findFilesToSync(sourceDir, repository)
+            
+            if (files.isEmpty()) {
+                val errorMessage = """
+                    未找到可同步的文件
+                    请检查:
+                    1. 文件匹配模式是否正确: ${repository.filePatterns ?: listOf("**/*.proto")}
+                    2. 源目录是否包含匹配的文件: ${repository.sourceDirectory}
+                    3. 文件是否被排除规则过滤: ${repository.excludePatterns}
+                """.trimIndent()
+                NotificationUtils.showError(project, "同步失败", errorMessage)
+                throw SyncException.FileException(errorMessage)
+            }
+
+            // 让用户选择要同步的文件
+            val selectedFiles = chooseFilesToSync(files, sourceDir)
+            if (selectedFiles.isEmpty()) {
+                return // 用户取消了选择
+            }
+            
             indicator.isIndeterminate = false
             indicator.fraction = 0.0
             
             // 备份现有文件
-            indicator.text = "备份文件..."
-            val existingFiles = files.map { file ->
-                val relativePath = sourceDir.relativize(file)
-                targetDir.resolve(relativePath)
-            }
-            backupManager.backupFiles(repository, existingFiles)
+            indicator.text = "正在备份文件..."
+            backupSelectedFiles(repository, selectedFiles, targetDir)
             
-            // 同步文件
-            files.forEachIndexed { index, file ->
-                val relativePath = sourceDir.relativize(file)
-                val targetFile = targetDir.resolve(relativePath)
-                
-                // 创建目标目录
-                targetFile.parent.toFile().mkdirs()
-                
-                // 复制文件
-                Files.copy(file, targetFile, StandardCopyOption.REPLACE_EXISTING)
-                
-                syncedFiles.add(relativePath.toString())
-                indicator.fraction = (index + 1).toDouble() / files.size
-                indicator.text = "同步文件: $relativePath"
+            // 同步选中的文件
+            var successCount = 0
+            selectedFiles.forEachIndexed { index, file ->
+                try {
+                    val relativePath = sourceDir.relativize(file)
+                    val targetFile = targetDir.resolve(relativePath)
+                    
+                    // 创建目标目录
+                    targetFile.parent.toFile().mkdirs()
+                    
+                    // 复制文件
+                    Files.copy(file, targetFile, StandardCopyOption.REPLACE_EXISTING)
+                    
+                    syncedFiles.add(relativePath.toString())
+                    successCount++
+                    
+                    // 更新进度
+                    indicator.fraction = (index + 1).toDouble() / selectedFiles.size
+                    indicator.text = "正在同步: $relativePath (${index + 1}/${selectedFiles.size})"
+                    
+                } catch (e: Exception) {
+                    val errorMessage = "同步文件失败: ${file}, 原因: ${e.message}"
+                    NotificationUtils.showError(project, "同步失败", errorMessage)
+                    throw SyncException.FileException(errorMessage, e)
+                }
             }
             
-            // 清理旧备份
-            val maxBackups = repository.backupConfig?.maxBackups ?: 10
-            backupManager.cleanOldBackups(maxBackups)
+            // 显示成功通知
+            val duration = System.currentTimeMillis() - startTime
+            NotificationUtils.showInfo(
+                project,
+                "同步成功",
+                """
+                已同步 $successCount 个文件
+                耗时: ${duration / 1000.0} 秒
+                """.trimIndent()
+            )
             
         } catch (e: Exception) {
-            throw SyncException.FileException("同步文件失败", e)
+            val errorMessage = "同步失败: ${e.message}"
+            NotificationUtils.showError(project, "同步失败", errorMessage)
+            throw SyncException.FileException(errorMessage, e)
+        }
+    }
+
+    // 让用户选择要同步的文件
+    private fun chooseFilesToSync(availableFiles: List<Path>, sourceDir: Path): List<Path> {
+        var selectedFiles = emptyList<Path>()
+        
+        // 在 EDT 线程上执行对话框操作
+        ApplicationManager.getApplication().invokeAndWait {
+            val dialog = object : DialogWrapper(project, true) {
+                private val checkBoxList = CheckBoxList<String>()
+                
+                init {
+                    title = "选择要同步的文件"
+                    init()
+                    
+                    // 添加文件列表
+                    availableFiles.forEach { file ->
+                        val relativePath = sourceDir.relativize(file).toString()
+                        checkBoxList.addItem(relativePath, relativePath, true)  // 默认全选
+                    }
+                }
+                
+                override fun createCenterPanel(): JComponent {
+                    val scrollPane = JBScrollPane(checkBoxList)
+                    scrollPane.preferredSize = Dimension(400, 300)
+                    return scrollPane
+                }
+                
+                fun getSelectedFiles(): List<Path> {
+                    return checkBoxList.selectedIndices.map { index ->
+                        availableFiles[index]
+                    }
+                }
+            }
+
+            if (dialog.showAndGet()) {
+                selectedFiles = dialog.getSelectedFiles()
+            }
+        }
+        
+        return selectedFiles
+    }
+
+    // 备份选中的文件
+    private fun backupSelectedFiles(repository: Repository, filesToSync: List<Path>, targetDir: Path) {
+        try {
+            val existingFiles = filesToSync.map { file ->
+                targetDir.resolve(file.fileName)
+            }
+            backupManager.backupFiles(repository, existingFiles)
+        } catch (e: Exception) {
+            val errorMessage = "备份文件失败: ${e.message}"
+            NotificationUtils.showError(project, "备份失败", errorMessage)
+            throw SyncException.FileException(errorMessage, e)
         }
     }
 
@@ -263,6 +472,17 @@ class FileSyncManager(
             Path.of(repository.targetDirectory)
         } else {
             projectDir.resolve(repository.targetDirectory)
+        }
+    }
+
+    // 显示通知也需要在 EDT 上执行
+    private fun showNotification(title: String, message: String, isError: Boolean = false) {
+        invokeLater {
+            if (isError) {
+                NotificationUtils.showError(project, title, message)
+            } else {
+                NotificationUtils.showInfo(project, title, message)
+            }
         }
     }
 } 
