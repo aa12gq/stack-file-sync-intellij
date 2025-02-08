@@ -8,5 +8,8 @@ data class PostSyncCommand(
     var directory: String = "",
     
     @Tag("command")
-    var command: String = ""
+    var command: String = "",
+
+    @Tag("order")
+    var order: Int = 0
 ) 

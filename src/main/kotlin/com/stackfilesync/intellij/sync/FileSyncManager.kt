@@ -475,9 +475,12 @@ class FileSyncManager(
     private fun executePostSyncCommands(repository: Repository) {
         val workspaceRoot = project.basePath ?: throw RuntimeException("无法获取项目目录")
         
-        repository.postSyncCommands.forEachIndexed { index, command ->
+        // 按order字段排序命令
+        val sortedCommands = repository.postSyncCommands.sortedBy { it.order }
+        
+        sortedCommands.forEachIndexed { index, command ->
             try {
-                logService.appendLog("\n执行命令 ${index + 1}/${repository.postSyncCommands.size}")
+                logService.appendLog("\n执行命令 [${command.order}] ${index + 1}/${sortedCommands.size}")
                 
                 // 解析命令执行目录
                 val cmdDir = if (command.directory.startsWith("/")) {

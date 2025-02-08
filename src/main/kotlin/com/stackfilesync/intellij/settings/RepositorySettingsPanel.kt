@@ -25,10 +25,12 @@ import com.intellij.openapi.project.Project
 import java.awt.Dimension
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.Panel
-import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
 import javax.swing.DefaultListCellRenderer
 import javax.swing.JList
+import java.awt.GridBagConstraints
+import java.awt.GridBagLayout
+import java.awt.Insets
 
 class RepositorySettingsPanel(private val project: Project) {
     private var panel: DialogPanel? = null
@@ -102,15 +104,14 @@ class RepositorySettingsPanel(private val project: Project) {
                 
                 group("自动同步") {
                     row {
-                        checkBox("启用自动同步")
-                            .bindSelected(
-                                { repository.autoSync?.enabled ?: false },
-                                { enabled ->
-                                    repository.autoSync = if (enabled) {
-                                        AutoSyncConfig(enabled = true)
-                                    } else null
-                                }
-                            )
+                        val autoSyncCheckBox = JCheckBox("启用自动同步")
+                        autoSyncCheckBox.isSelected = repository.autoSync?.enabled ?: false
+                        autoSyncCheckBox.addActionListener {
+                            repository.autoSync = if (autoSyncCheckBox.isSelected) {
+                                AutoSyncConfig(enabled = true)
+                            } else null
+                        }
+                        cell(autoSyncCheckBox)
                     }
                     
                     row("同步间隔(秒):") {
@@ -131,13 +132,12 @@ class RepositorySettingsPanel(private val project: Project) {
                 
                 group("备份设置") {
                     row {
-                        checkBox("启用备份")
-                            .bindSelected(
-                                { repository.backupConfig?.enabled ?: true },
-                                { enabled ->
-                                    repository.backupConfig = BackupConfig(enabled = enabled)
-                                }
-                            )
+                        val backupCheckBox = JCheckBox("启用备份")
+                        backupCheckBox.isSelected = repository.backupConfig?.enabled ?: true
+                        backupCheckBox.addActionListener {
+                            repository.backupConfig = BackupConfig(enabled = backupCheckBox.isSelected)
+                        }
+                        cell(backupCheckBox)
                     }
                     
                     row("最大备份数:") {
@@ -158,15 +158,14 @@ class RepositorySettingsPanel(private val project: Project) {
                 
                 group("内网同步") {
                     row {
-                        checkBox("启用内网同步")
-                            .bindSelected(
-                                { repository.internalSync?.enabled ?: false },
-                                { enabled ->
-                                    repository.internalSync = if (enabled) {
-                                        InternalSyncConfig(enabled = true)
-                                    } else null
-                                }
-                            )
+                        val internalSyncCheckBox = JCheckBox("启用内网同步")
+                        internalSyncCheckBox.isSelected = repository.internalSync?.enabled ?: false
+                        internalSyncCheckBox.addActionListener {
+                            repository.internalSync = if (internalSyncCheckBox.isSelected) {
+                                InternalSyncConfig(enabled = true)
+                            } else null
+                        }
+                        cell(internalSyncCheckBox)
                     }
                     
                     row("网络路径:") {
@@ -222,14 +221,14 @@ class RepositorySettingsPanel(private val project: Project) {
                             ): Component {
                                 super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
                                 val command = value as PostSyncCommand
-                                text = "${command.directory}: ${command.command}"
+                                text = "[${command.order}] ${command.directory}: ${command.command}"
                                 return this
                             }
                         }
                     }
                     
-                    // 加载现有命令
-                    repository.postSyncCommands.forEach { command ->
+                    // 加载现有命令并按序号排序
+                    repository.postSyncCommands.sortedBy { it.order }.forEach { command ->
                         listModel.addElement(command)
                     }
                     
@@ -241,56 +240,106 @@ class RepositorySettingsPanel(private val project: Project) {
                     
                     row {
                         button("添加命令") {
-                            val dialog = object : DialogWrapper(project, false) {  // 改为 false
+                            val dialog = object : DialogWrapper(project, false) {
+                                private val orderField = JBTextField().apply {
+                                    preferredSize = Dimension(100, 30)
+                                    text = "0"
+                                }
                                 private val directoryField = JBTextField().apply {
-                                    preferredSize = Dimension(300, 30)  // 设置输入框大小
+                                    preferredSize = Dimension(300, 30)
                                 }
                                 private val commandField = JBTextField().apply {
                                     preferredSize = Dimension(300, 30)
                                 }
-                                
+
                                 init {
+                                    init()
                                     title = "添加后处理命令"
-                                    isResizable = true  // 允许调整大小
-                                    init()  // 必须最后调用
                                 }
-                                
+
                                 override fun createCenterPanel(): JComponent {
-                                    return JPanel(BorderLayout(10, 10)).apply {
+                                    return JPanel(GridBagLayout()).apply {
                                         border = JBUI.Borders.empty(10)
                                         preferredSize = Dimension(400, 150)
                                         
-                                        add(JPanel(BorderLayout(5, 5)).apply {
-                                            add(JLabel("目录:"), BorderLayout.WEST)
-                                            add(directoryField, BorderLayout.CENTER)
-                                        }, BorderLayout.NORTH)
+                                        val gbc = GridBagConstraints().apply {
+                                            fill = GridBagConstraints.HORIZONTAL
+                                            insets = Insets(5, 5, 5, 5)
+                                        }
                                         
-                                        add(JPanel(BorderLayout(5, 5)).apply {
-                                            add(JLabel("命令:"), BorderLayout.WEST)
-                                            add(commandField, BorderLayout.CENTER)
-                                        }, BorderLayout.CENTER)
+                                        // 序号
+                                        gbc.apply {
+                                            gridx = 0
+                                            gridy = 0
+                                            weightx = 0.0
+                                        }
+                                        add(JLabel("执行序号:"), gbc)
                                         
-                                        add(JLabel("注意：目录路径可以是相对于项目根目录的路径，也可以是绝对路径"), 
-                                            BorderLayout.SOUTH)
+                                        gbc.apply {
+                                            gridx = 1
+                                            weightx = 1.0
+                                        }
+                                        add(orderField, gbc)
+                                        
+                                        // 目录
+                                        gbc.apply {
+                                            gridx = 0
+                                            gridy = 1
+                                            weightx = 0.0
+                                        }
+                                        add(JLabel("目录:"), gbc)
+                                        
+                                        gbc.apply {
+                                            gridx = 1
+                                            weightx = 1.0
+                                        }
+                                        add(directoryField, gbc)
+                                        
+                                        // 命令
+                                        gbc.apply {
+                                            gridx = 0
+                                            gridy = 2
+                                            weightx = 0.0
+                                        }
+                                        add(JLabel("命令:"), gbc)
+                                        
+                                        gbc.apply {
+                                            gridx = 1
+                                            weightx = 1.0
+                                        }
+                                        add(commandField, gbc)
                                     }
                                 }
-                                
+
                                 override fun getPreferredFocusedComponent() = directoryField
                                 
-                                fun getCommand(): PostSyncCommand? {
+                                override fun doOKAction() {
+                                    val order = try {
+                                        orderField.text.toInt()
+                                    } catch (e: NumberFormatException) {
+                                        0
+                                    }
                                     val dir = directoryField.text.trim()
                                     val cmd = commandField.text.trim()
-                                    if (dir.isBlank() || cmd.isBlank()) return null
-                                    return PostSyncCommand(directory = dir, command = cmd)
-                                }
-                            }
-                            
-                            if (dialog.showAndGet()) {
-                                dialog.getCommand()?.let { command ->
-                                    listModel.addElement(command)
+                                    if (dir.isBlank() || cmd.isBlank()) return
+                                    
+                                    val newCommand = PostSyncCommand(
+                                        directory = dir,
+                                        command = cmd,
+                                        order = order
+                                    )
+                                    listModel.addElement(newCommand)
+                                    // 重新排序列表
+                                    val sortedCommands = (0 until listModel.size())
+                                        .map { listModel.getElementAt(it) }
+                                        .sortedBy { it.order }
+                                    listModel.clear()
+                                    sortedCommands.forEach { listModel.addElement(it) }
                                     updateCommands()
+                                    super.doOKAction()
                                 }
                             }
+                            dialog.show()
                         }
                         
                         button("删除命令") {
@@ -306,6 +355,10 @@ class RepositorySettingsPanel(private val project: Project) {
                             if (selected >= 0) {
                                 val command = listModel.getElementAt(selected)
                                 val dialog = object : DialogWrapper(project, false) {
+                                    private val orderField = JBTextField().apply {
+                                        text = command.order.toString()
+                                        preferredSize = Dimension(100, 30)
+                                    }
                                     private val directoryField = JBTextField().apply {
                                         text = command.directory
                                         preferredSize = Dimension(300, 30)
@@ -317,45 +370,94 @@ class RepositorySettingsPanel(private val project: Project) {
                                     
                                     init {
                                         title = "编辑后处理命令"
-                                        isResizable = true
                                         init()
                                     }
                                     
                                     override fun createCenterPanel(): JComponent {
-                                        return JPanel(BorderLayout(10, 10)).apply {
+                                        return JPanel(GridBagLayout()).apply {
                                             border = JBUI.Borders.empty(10)
                                             preferredSize = Dimension(400, 150)
                                             
-                                            add(JPanel(BorderLayout(5, 5)).apply {
-                                                add(JLabel("目录:"), BorderLayout.WEST)
-                                                add(directoryField, BorderLayout.CENTER)
-                                            }, BorderLayout.NORTH)
+                                            val gbc = GridBagConstraints().apply {
+                                                fill = GridBagConstraints.HORIZONTAL
+                                                insets = Insets(5, 5, 5, 5)
+                                            }
                                             
-                                            add(JPanel(BorderLayout(5, 5)).apply {
-                                                add(JLabel("命令:"), BorderLayout.WEST)
-                                                add(commandField, BorderLayout.CENTER)
-                                            }, BorderLayout.CENTER)
+                                            // 序号
+                                            gbc.apply {
+                                                gridx = 0
+                                                gridy = 0
+                                                weightx = 0.0
+                                            }
+                                            add(JLabel("执行序号:"), gbc)
                                             
-                                            add(JLabel("注意：目录路径可以是相对于项目根目录的路径，也可以是绝对路径"), 
-                                                BorderLayout.SOUTH)
+                                            gbc.apply {
+                                                gridx = 1
+                                                weightx = 1.0
+                                            }
+                                            add(orderField, gbc)
+                                            
+                                            // 目录
+                                            gbc.apply {
+                                                gridx = 0
+                                                gridy = 1
+                                                weightx = 0.0
+                                            }
+                                            add(JLabel("目录:"), gbc)
+                                            
+                                            gbc.apply {
+                                                gridx = 1
+                                                weightx = 1.0
+                                            }
+                                            add(directoryField, gbc)
+                                            
+                                            // 命令
+                                            gbc.apply {
+                                                gridx = 0
+                                                gridy = 2
+                                                weightx = 0.0
+                                            }
+                                            add(JLabel("命令:"), gbc)
+                                            
+                                            gbc.apply {
+                                                gridx = 1
+                                                weightx = 1.0
+                                            }
+                                            add(commandField, gbc)
                                         }
                                     }
                                     
                                     override fun getPreferredFocusedComponent() = directoryField
                                     
-                                    fun getCommand(): PostSyncCommand? {
+                                    override fun doOKAction() {
+                                        val order = try {
+                                            orderField.text.toInt()
+                                        } catch (e: NumberFormatException) {
+                                            0
+                                        }
                                         val dir = directoryField.text.trim()
                                         val cmd = commandField.text.trim()
-                                        if (dir.isBlank() || cmd.isBlank()) return null
-                                        return PostSyncCommand(directory = dir, command = cmd)
+                                        if (dir.isBlank() || cmd.isBlank()) return
+                                        
+                                        val newCommand = PostSyncCommand(
+                                            directory = dir,
+                                            command = cmd,
+                                            order = order
+                                        )
+                                        listModel.set(selected, newCommand)
+                                        // 重新排序列表
+                                        val sortedCommands = (0 until listModel.size())
+                                            .map { listModel.getElementAt(it) }
+                                            .sortedBy { it.order }
+                                        listModel.clear()
+                                        sortedCommands.forEach { listModel.addElement(it) }
+                                        updateCommands()
+                                        super.doOKAction()
                                     }
                                 }
                                 
                                 if (dialog.showAndGet()) {
-                                    dialog.getCommand()?.let { newCommand ->
-                                        listModel.set(selected, newCommand)
-                                        updateCommands()
-                                    }
+                                    updateCommands()
                                 }
                             }
                         }
