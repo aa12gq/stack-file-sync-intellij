@@ -40,6 +40,13 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
             layout = BoxLayout(this, BoxLayout.X_AXIS)
             add(JLabel("仓库列表"))
             add(Box.createHorizontalGlue())
+            add(JButton(AllIcons.Actions.Refresh).apply {
+                toolTipText = "刷新仓库列表"
+                addActionListener {
+                    loadRepositories()
+                }
+            })
+            add(Box.createHorizontalStrut(5))  // 添加一点间距
             add(JButton(AllIcons.General.Add).apply {
                 toolTipText = "添加仓库"
                 addActionListener {
