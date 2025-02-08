@@ -300,6 +300,65 @@ class RepositorySettingsPanel(private val project: Project) {
                                 updateCommands()
                             }
                         }
+                        
+                        button("编辑命令") {
+                            val selected = commandList.selectedIndex
+                            if (selected >= 0) {
+                                val command = listModel.getElementAt(selected)
+                                val dialog = object : DialogWrapper(project, false) {
+                                    private val directoryField = JBTextField().apply {
+                                        text = command.directory
+                                        preferredSize = Dimension(300, 30)
+                                    }
+                                    private val commandField = JBTextField().apply {
+                                        text = command.command
+                                        preferredSize = Dimension(300, 30)
+                                    }
+                                    
+                                    init {
+                                        title = "编辑后处理命令"
+                                        isResizable = true
+                                        init()
+                                    }
+                                    
+                                    override fun createCenterPanel(): JComponent {
+                                        return JPanel(BorderLayout(10, 10)).apply {
+                                            border = JBUI.Borders.empty(10)
+                                            preferredSize = Dimension(400, 150)
+                                            
+                                            add(JPanel(BorderLayout(5, 5)).apply {
+                                                add(JLabel("目录:"), BorderLayout.WEST)
+                                                add(directoryField, BorderLayout.CENTER)
+                                            }, BorderLayout.NORTH)
+                                            
+                                            add(JPanel(BorderLayout(5, 5)).apply {
+                                                add(JLabel("命令:"), BorderLayout.WEST)
+                                                add(commandField, BorderLayout.CENTER)
+                                            }, BorderLayout.CENTER)
+                                            
+                                            add(JLabel("注意：目录路径可以是相对于项目根目录的路径，也可以是绝对路径"), 
+                                                BorderLayout.SOUTH)
+                                        }
+                                    }
+                                    
+                                    override fun getPreferredFocusedComponent() = directoryField
+                                    
+                                    fun getCommand(): PostSyncCommand? {
+                                        val dir = directoryField.text.trim()
+                                        val cmd = commandField.text.trim()
+                                        if (dir.isBlank() || cmd.isBlank()) return null
+                                        return PostSyncCommand(directory = dir, command = cmd)
+                                    }
+                                }
+                                
+                                if (dialog.showAndGet()) {
+                                    dialog.getCommand()?.let { newCommand ->
+                                        listModel.set(selected, newCommand)
+                                        updateCommands()
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
