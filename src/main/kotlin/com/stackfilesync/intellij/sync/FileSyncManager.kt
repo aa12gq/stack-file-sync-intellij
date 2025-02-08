@@ -148,7 +148,6 @@ class FileSyncManager(
             val gitDir = tempDir.resolve(repository.name)
             
             // 克隆仓库
-            logService.appendLog("克隆仓库: ${repository.url}")
             cloneRepository(repository, gitDir)
             
             // 同步文件
@@ -178,7 +177,9 @@ class FileSyncManager(
 
     private fun cloneRepository(repository: Repository, gitDir: Path) {
         try {
-            indicator.text = "正在克隆仓库: ${repository.url}..."
+            indicator.text = "正在克隆仓库: ${repository.url} (分支: ${repository.branch})..."
+            logService.appendLog("克隆仓库: ${repository.url}")
+            logService.appendLog("指定分支: ${repository.branch}")
             
             // 先删除目标目录如果存在的话
             if (Files.exists(gitDir)) {
@@ -194,7 +195,7 @@ class FileSyncManager(
                 GitCommand.CLONE
             )
             
-            // 参照VSCode插件的克隆参数，移除重复的"clone"命令
+            // 克隆参数
             handler.addParameters(
                 "--quiet",  // 减少输出
                 "--single-branch",  // 只克隆单个分支
@@ -204,6 +205,9 @@ class FileSyncManager(
                 gitDir.toString()
             )
             
+            // 命令日志
+            logService.appendLog("执行命令: git clone --quiet --single-branch --branch ${repository.branch} --depth=1 ${repository.url} ${gitDir}")
+            
             val result = git.runCommand(handler)
             
             if (result.exitCode != 0) {
@@ -212,17 +216,37 @@ class FileSyncManager(
                     仓库: ${repository.url}
                     分支: ${repository.branch}
                     错误信息: ${result.errorOutput}
+                    
+                    请检查:
+                    1. 仓库地址是否正确
+                    2. 分支名称是否正确
+                    3. 是否有权限访问该仓库和分支
+                    4. 网络连接是否正常
                 """.trimIndent()
                 
-                invokeLater {
-                    NotificationUtils.showError(
-                        project,
-                        "同步失败",
-                        errorMessage
-                    )
-                }
-                
+                logService.appendLog("❌ $errorMessage")
                 throw SyncException.GitException(errorMessage)
+            }
+            
+            // 验证当前分支
+            val branchHandler = GitLineHandler(
+                project,
+                gitDir.toFile(),
+                GitCommand.REV_PARSE
+            )
+            branchHandler.addParameters("--abbrev-ref", "HEAD")
+            
+            val branchResult = git.runCommand(branchHandler)
+            val currentBranch = branchResult.output.joinToString("").trim()
+            
+            if (currentBranch != repository.branch) {
+                logService.appendLog("⚠️ 当前分支 ($currentBranch) 与配置的分支 (${repository.branch}) 不一致")
+                logService.appendLog("正在切换到指定分支...")
+                
+                // 切换到指定分支
+                checkoutBranch(repository, gitDir)
+            } else {
+                logService.appendLog("✅ 已在指定分支: ${repository.branch}")
             }
             
         } catch (e: Exception) {
@@ -231,16 +255,15 @@ class FileSyncManager(
                 仓库: ${repository.url}
                 分支: ${repository.branch}
                 错误信息: ${e.message}
+                
+                请检查:
+                1. 仓库地址是否正确
+                2. 分支名称是否正确
+                3. 是否有权限访问该仓库和分支
+                4. 网络连接是否正常
             """.trimIndent()
             
-            invokeLater {
-                NotificationUtils.showError(
-                    project,
-                    "同步失败",
-                    errorMessage
-                )
-            }
-            
+            logService.appendLog("❌ $errorMessage")
             throw SyncException.GitException(errorMessage, e)
         }
     }

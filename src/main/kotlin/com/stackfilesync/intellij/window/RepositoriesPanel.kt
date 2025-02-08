@@ -47,8 +47,8 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
             })
             add(Box.createHorizontalStrut(5))  // 添加一点间距
-            add(JButton(AllIcons.General.Add).apply {
-                toolTipText = "添加仓库"
+            add(JButton(AllIcons.General.Settings).apply {
+                toolTipText = "管理仓库"
                 addActionListener {
                     ShowSettingsUtil.getInstance().showSettingsDialog(
                         project,
