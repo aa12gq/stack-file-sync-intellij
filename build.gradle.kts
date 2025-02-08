@@ -5,7 +5,6 @@ plugins {
 }
 
 dependencies {
-    implementation("com.intellij:forms_rt:7.0.3")
     implementation("org.jetbrains:annotations:24.0.0")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.2")
     implementation("com.google.code.gson:gson:2.10.1")
@@ -25,7 +24,7 @@ intellij {
     type.set("IC") // IC 表示 IntelliJ IDEA Community Edition
     plugins.set(listOf(
         "Git4Idea",  // 注意大小写
-        "java",       //  Java 插件依赖
+        "java",      // Java 插件依赖
         "platform-images"  // 添加图标支持
     ))
     updateSinceUntilBuild.set(false)  // 禁用版本限制
@@ -54,11 +53,25 @@ tasks {
     }
 
     publishPlugin {
-        token.set(System.getenv("PUBLISH_TOKEN")) // JetBrains Marketplace 的发布令牌
+        token.set(System.getenv("PUBLISH_TOKEN"))
     }
 
     // 禁用搜索选项构建任务
     buildSearchableOptions {
         enabled = false
     }
+    
+    // 配置打包任务，排除 IDE 包
+    prepareSandbox {
+        exclude("com/intellij/uiDesigner/**")
+    }
+}
+
+// 配置 jar 任务，排除 IDE 包
+tasks.jar {
+    exclude("com/intellij/uiDesigner/**")
+    exclude("com/intellij/uiDesigner/core/**")
+    exclude("com/intellij/uiDesigner/lw/**")
+    exclude("com/intellij/uiDesigner/compiler/**")
+    exclude("com/intellij/uiDesigner/shared/**")
 }
