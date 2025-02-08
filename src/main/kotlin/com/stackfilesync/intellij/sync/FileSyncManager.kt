@@ -542,10 +542,11 @@ class FileSyncManager(
                     while (reader.readLine().also { line = it } != null) {
                         val output = line ?: ""
                         logService.appendLog(output)
-                        // 检查是否包含错误信息，但忽略一些无害的错误
-                        if ((output.contains("error", ignoreCase = true) && !output.contains("successfully", ignoreCase = true)) || 
-                            output.contains("command not found", ignoreCase = true) ||
-                            (output.contains("no such file", ignoreCase = true) && !output.contains("generated", ignoreCase = true))) {
+                        // 只在遇到真正的错误时才标记为失败
+                        if (output.contains("command not found", ignoreCase = true) ||
+                            output.contains("permission denied", ignoreCase = true) ||
+                            output.contains("no such file or directory", ignoreCase = true) ||
+                            output.contains("failed with exit code", ignoreCase = true)) {
                             hasError = true
                         }
                     }
@@ -553,7 +554,8 @@ class FileSyncManager(
 
                 // 等待命令执行完成
                 val exitCode = process.waitFor()
-                if (exitCode != 0 || hasError) {
+                // 只有在退出码非0且确实发生错误时才认为是失败
+                if (exitCode != 0 && hasError) {
                     throw RuntimeException("命令执行失败，退出码: $exitCode")
                 }
 
