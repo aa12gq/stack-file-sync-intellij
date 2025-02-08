@@ -136,7 +136,7 @@ class FileSyncManager(
         }
         
         if (repository.sourceDirectory.isBlank()) {
-            throw SyncException.ConfigException("源目录不能为空")
+            throw SyncException.ConfigException("远程目录不能为空")
         }
         if (repository.targetDirectory.isBlank()) {
             throw SyncException.ConfigException("目标目录不能为空")
@@ -340,13 +340,13 @@ class FileSyncManager(
             val targetDir = getTargetDirectory(repository)
             val sourceDir = sourcePath.resolve(repository.sourceDirectory)
             
-            // 检查源目录是否存在
+            // 检查远程目录是否存在
             if (!Files.exists(sourceDir)) {
                 val errorMessage = """
-                    未找到源目录
+                    未找到远程目录
                     目录: ${sourceDir}
                     请检查:
-                    1. 源目录路径是否正确
+                    1. 远程目录路径是否正确
                     2. 仓库是否包含该目录
                 """.trimIndent()
                 logService.appendLog("❌ $errorMessage")

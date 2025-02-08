@@ -31,6 +31,7 @@ import javax.swing.JList
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.Insets
+import com.intellij.icons.AllIcons
 
 class RepositorySettingsPanel(private val project: Project) {
     private var panel: DialogPanel? = null
@@ -69,11 +70,11 @@ class RepositorySettingsPanel(private val project: Project) {
                 }
                 
                 group("目录设置") {
-                    row("源目录:") {
+                    row("远程目录:") {
                         textField()
                             .bindText({ repository.sourceDirectory }, { repository.sourceDirectory = it })
                             .validationOnInput {
-                                if (it.text.isBlank()) error("源目录不能为空") else null
+                                if (it.text.isBlank()) error("远程目录不能为空") else null
                             }
                     }
                     
@@ -244,12 +245,31 @@ class RepositorySettingsPanel(private val project: Project) {
                                 private val orderField = JBTextField().apply {
                                     preferredSize = Dimension(100, 30)
                                     text = "0"
+                                    toolTipText = "请输入非负整数，数字越小执行顺序越靠前"
+                                    document.addDocumentListener(object : DocumentListener {
+                                        override fun insertUpdate(e: DocumentEvent) = validateOrder()
+                                        override fun removeUpdate(e: DocumentEvent) = validateOrder()
+                                        override fun changedUpdate(e: DocumentEvent) = validateOrder()
+                                    })
                                 }
                                 private val directoryField = JBTextField().apply {
                                     preferredSize = Dimension(300, 30)
                                 }
                                 private val commandField = JBTextField().apply {
                                     preferredSize = Dimension(300, 30)
+                                }
+
+                                private fun validateOrder() {
+                                    try {
+                                        val order = orderField.text.toInt()
+                                        if (order < 0) {
+                                            setErrorText("执行序号不能为负数", orderField)
+                                        } else {
+                                            setErrorText(null, orderField)
+                                        }
+                                    } catch (e: NumberFormatException) {
+                                        setErrorText("请输入有效的整数", orderField)
+                                    }
                                 }
 
                                 init {
@@ -275,16 +295,22 @@ class RepositorySettingsPanel(private val project: Project) {
                                         }
                                         add(JLabel("执行序号:"), gbc)
                                         
+                                        // 序号说明
                                         gbc.apply {
-                                            gridx = 1
-                                            weightx = 1.0
+                                            gridx = 0
+                                            gridy = 1
+                                            gridwidth = 2
                                         }
-                                        add(orderField, gbc)
+                                        add(JLabel("说明：数字越小执行顺序越靠前，必须为非负整数").apply {
+                                            font = font.deriveFont(font.size2D - 2f)
+                                            foreground = UIManager.getColor("Label.disabledForeground")
+                                        }, gbc)
                                         
                                         // 目录
                                         gbc.apply {
                                             gridx = 0
-                                            gridy = 1
+                                            gridy = 2
+                                            gridwidth = 1
                                             weightx = 0.0
                                         }
                                         add(JLabel("目录:"), gbc)
@@ -298,7 +324,7 @@ class RepositorySettingsPanel(private val project: Project) {
                                         // 命令
                                         gbc.apply {
                                             gridx = 0
-                                            gridy = 2
+                                            gridy = 3
                                             weightx = 0.0
                                         }
                                         add(JLabel("命令:"), gbc)
@@ -315,9 +341,15 @@ class RepositorySettingsPanel(private val project: Project) {
                                 
                                 override fun doOKAction() {
                                     val order = try {
-                                        orderField.text.toInt()
+                                        val value = orderField.text.toInt()
+                                        if (value < 0) {
+                                            setErrorText("执行序号不能为负数", orderField)
+                                            return
+                                        }
+                                        value
                                     } catch (e: NumberFormatException) {
-                                        0
+                                        setErrorText("请输入有效的整数", orderField)
+                                        return
                                     }
                                     val dir = directoryField.text.trim()
                                     val cmd = commandField.text.trim()
@@ -342,13 +374,17 @@ class RepositorySettingsPanel(private val project: Project) {
                             dialog.show()
                         }
                         
-                        button("删除命令") {
-                            val selected = commandList.selectedIndex
-                            if (selected >= 0) {
-                                listModel.remove(selected)
-                                updateCommands()
+                        cell(JButton("删除命令").apply {
+                            icon = AllIcons.Actions.GC
+                            toolTipText = "删除选中的命令"
+                            addActionListener {
+                                val selected = commandList.selectedIndex
+                                if (selected >= 0) {
+                                    listModel.remove(selected)
+                                    updateCommands()
+                                }
                             }
-                        }
+                        }).align(Align.FILL)
                         
                         button("编辑命令") {
                             val selected = commandList.selectedIndex
@@ -358,6 +394,12 @@ class RepositorySettingsPanel(private val project: Project) {
                                     private val orderField = JBTextField().apply {
                                         text = command.order.toString()
                                         preferredSize = Dimension(100, 30)
+                                        toolTipText = "请输入非负整数，数字越小执行顺序越靠前"
+                                        document.addDocumentListener(object : DocumentListener {
+                                            override fun insertUpdate(e: DocumentEvent) = validateOrder()
+                                            override fun removeUpdate(e: DocumentEvent) = validateOrder()
+                                            override fun changedUpdate(e: DocumentEvent) = validateOrder()
+                                        })
                                     }
                                     private val directoryField = JBTextField().apply {
                                         text = command.directory
@@ -366,6 +408,19 @@ class RepositorySettingsPanel(private val project: Project) {
                                     private val commandField = JBTextField().apply {
                                         text = command.command
                                         preferredSize = Dimension(300, 30)
+                                    }
+                                    
+                                    private fun validateOrder() {
+                                        try {
+                                            val order = orderField.text.toInt()
+                                            if (order < 0) {
+                                                setErrorText("执行序号不能为负数", orderField)
+                                            } else {
+                                                setErrorText(null, orderField)
+                                            }
+                                        } catch (e: NumberFormatException) {
+                                            setErrorText("请输入有效的整数", orderField)
+                                        }
                                     }
                                     
                                     init {
@@ -397,10 +452,22 @@ class RepositorySettingsPanel(private val project: Project) {
                                             }
                                             add(orderField, gbc)
                                             
-                                            // 目录
+                                            // 序号说明
                                             gbc.apply {
                                                 gridx = 0
                                                 gridy = 1
+                                                gridwidth = 2
+                                            }
+                                            add(JLabel("说明：数字越小执行顺序越靠前，必须为非负整数").apply {
+                                                font = font.deriveFont(font.size2D - 2f)
+                                                foreground = UIManager.getColor("Label.disabledForeground")
+                                            }, gbc)
+                                            
+                                            // 目录
+                                            gbc.apply {
+                                                gridx = 0
+                                                gridy = 2
+                                                gridwidth = 1
                                                 weightx = 0.0
                                             }
                                             add(JLabel("目录:"), gbc)
@@ -414,7 +481,7 @@ class RepositorySettingsPanel(private val project: Project) {
                                             // 命令
                                             gbc.apply {
                                                 gridx = 0
-                                                gridy = 2
+                                                gridy = 3
                                                 weightx = 0.0
                                             }
                                             add(JLabel("命令:"), gbc)
@@ -431,9 +498,15 @@ class RepositorySettingsPanel(private val project: Project) {
                                     
                                     override fun doOKAction() {
                                         val order = try {
-                                            orderField.text.toInt()
+                                            val value = orderField.text.toInt()
+                                            if (value < 0) {
+                                                setErrorText("执行序号不能为负数", orderField)
+                                                return
+                                            }
+                                            value
                                         } catch (e: NumberFormatException) {
-                                            0
+                                            setErrorText("请输入有效的整数", orderField)
+                                            return
                                         }
                                         val dir = directoryField.text.trim()
                                         val cmd = commandField.text.trim()

@@ -11,7 +11,7 @@ object FilePatternMatcher {
         filePatterns: List<String>?,
         excludePatterns: List<String>?
     ): List<Path> {
-        // 检查源目录是否存在
+        // 检查远程目录是否存在
         if (!Files.exists(sourceDir)) {
             return emptyList()
         }
