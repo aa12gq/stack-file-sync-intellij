@@ -8,6 +8,7 @@ dependencies {
     implementation("com.intellij:forms_rt:7.0.3")
     implementation("org.jetbrains:annotations:24.0.0")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.2")
+    implementation("com.google.code.gson:gson:2.10.1")
 }
 
 group = "com.stackfilesync"
