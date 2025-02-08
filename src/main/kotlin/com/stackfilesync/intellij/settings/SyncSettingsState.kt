@@ -5,6 +5,8 @@ import com.stackfilesync.intellij.model.Repository
 import com.intellij.util.xmlb.annotations.Tag
 import com.intellij.util.xmlb.annotations.XCollection
 import com.intellij.util.xmlb.XmlSerializerUtil
+import com.intellij.util.messages.Topic
+import com.intellij.openapi.application.ApplicationManager
 
 @State(
     name = "StackFileSyncSettings",
@@ -29,6 +31,10 @@ class SyncSettingsState : PersistentStateComponent<SyncSettingsState> {
     fun setRepositories(repositories: List<Repository>) {
         repositoryList.clear()
         repositoryList.addAll(repositories.map { it.copy() })
+        // 发布设置变更事件
+        ApplicationManager.getApplication().messageBus
+            .syncPublisher(SETTINGS_CHANGED)
+            .settingsChanged()
     }
 
     fun getBackupEnabled(): Boolean = backupEnabledFlag
@@ -39,5 +45,13 @@ class SyncSettingsState : PersistentStateComponent<SyncSettingsState> {
 
     companion object {
         fun getInstance(): SyncSettingsState = service()
+        
+        // 定义设置变更事件
+        val SETTINGS_CHANGED = Topic.create("StackFileSyncSettingsChanged", SettingsChangeListener::class.java)
+    }
+    
+    // 设置变更监听器接口
+    interface SettingsChangeListener {
+        fun settingsChanged()
     }
 } 

@@ -102,6 +102,10 @@
         <!-- 自动同步服务 -->
         <projectService 
             serviceImplementation="com.stackfilesync.intellij.sync.AutoSyncManager"/>
+            
+        <!-- 启动活动 -->
+        <postStartupActivity 
+            implementation="com.stackfilesync.intellij.sync.AutoSyncStartupActivity"/>
         
         <!-- 通知组 -->
         <notificationGroup id="Stack File Sync"
