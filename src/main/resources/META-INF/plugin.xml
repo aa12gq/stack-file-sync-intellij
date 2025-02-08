@@ -1,7 +1,7 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
-    <id>com.stackfilesync.intellij</id>
+    <id>com.stackfilesync.plugin</id>
 
     <!-- Public plugin name should be written in Title Case.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
@@ -15,44 +15,44 @@
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
     <description><![CDATA[
         <h1>Stack File Sync</h1>
-        <p>Stack File Sync 是一个强大的 IntelliJ IDEA 插件，用于在多个项目之间同步文件和代码片段。它提供了一个简单而灵活的方式来管理和同步您的代码资产。</p>
+        <p>A powerful plugin for synchronizing files and code snippets between multiple projects. It provides a simple and flexible way to manage and sync your code assets.</p>
         
-        <p><img src="https://raw.githubusercontent.com/aa12gq/stack-file-sync-intellij/main/docs/images/demonstration.gif" alt="演示" width="800"/></p>
+        <p><img src="https://raw.githubusercontent.com/aa12gq/stack-file-sync-intellij/main/docs/images/demonstration.gif" alt="Demonstration" width="800"/></p>
         
-        <h2>功能特点</h2>
+        <h2>Key Features</h2>
         <ul>
-            <li>🔄 实时文件同步</li>
-            <li>🕒 可配置的自动同步间隔</li>
-            <li>📁 多仓库支持</li>
-            <li>🔒 安全的文件备份</li>
-            <li>⚡ 高性能文件传输</li>
-            <li>🛠 可自定义的同步规则</li>
-            <li>📊 详细的同步日志</li>
+            <li>🔄 Real-time file synchronization</li>
+            <li>🕒 Configurable auto-sync intervals</li>
+            <li>📁 Multi-repository support</li>
+            <li>🔒 Secure file backup</li>
+            <li>⚡ High-performance file transfer</li>
+            <li>🛠 Customizable sync rules</li>
+            <li>📊 Detailed sync logs</li>
         </ul>
 
-        <h2>使用方法</h2>
+        <h2>How to Use</h2>
         <ol>
-            <li>安装插件后，通过 <code>Tools -> Stack File Sync -> Configure</code> 打开配置面板</li>
-            <li>添加新的同步仓库</li>
-            <li>配置同步规则和自动同步选项</li>
-            <li>点击工具栏的同步按钮开始同步</li>
+            <li>After installation, open the configuration panel via <code>Tools -> Stack File Sync -> Configure</code></li>
+            <li>Add new sync repository</li>
+            <li>Configure sync rules and auto-sync options</li>
+            <li>Click the sync button in the toolbar to start syncing</li>
         </ol>
 
-        <h2>配置说明</h2>
-        <h3>仓库配置</h3>
+        <h2>Configuration</h2>
+        <h3>Repository Settings</h3>
         <ul>
-            <li><strong>名称</strong>: 仓库的唯一标识符</li>
-            <li><strong>本地路径</strong>: 需要同步的本地文件夹路径</li>
-            <li><strong>远程路径</strong>: 远程同步目标路径</li>
-            <li><strong>同步规则</strong>: 文件包含/排除规则</li>
-            <li><strong>自动同步</strong>: 启用/禁用自动同步功能</li>
+            <li><strong>Name</strong>: Unique identifier for the repository</li>
+            <li><strong>Local Path</strong>: Local folder path to sync</li>
+            <li><strong>Remote Path</strong>: Remote sync target path</li>
+            <li><strong>Sync Rules</strong>: File include/exclude patterns</li>
+            <li><strong>Auto Sync</strong>: Enable/disable auto sync feature</li>
         </ul>
 
-        <h3>自动同步设置</h3>
+        <h3>Auto Sync Settings</h3>
         <ul>
-            <li><strong>启用状态</strong>: 开启或关闭自动同步</li>
-            <li><strong>同步间隔</strong>: 设置自动同步的时间间隔（秒）</li>
-            <li><strong>同步模式</strong>: 选择单向或双向同步</li>
+            <li><strong>Enable Status</strong>: Turn auto sync on/off</li>
+            <li><strong>Sync Interval</strong>: Set auto sync time interval (seconds)</li>
+            <li><strong>Sync Mode</strong>: Choose one-way or two-way sync</li>
         </ul>
     ]]></description>
 
