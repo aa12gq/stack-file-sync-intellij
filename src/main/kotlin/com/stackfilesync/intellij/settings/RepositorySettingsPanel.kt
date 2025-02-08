@@ -303,6 +303,8 @@ class RepositorySettingsPanel(private val project: Project) {
                     }
                 }
             }
+            // 确保命令列表被正确初始化
+            updateCommandList()
         }
         
         // 创建一个带滚动条的面板
@@ -319,14 +321,28 @@ class RepositorySettingsPanel(private val project: Project) {
         }
     }
 
-    fun getRepository(): Repository = repository
+    fun getRepository(): Repository {
+        panel?.apply()  // 确保所有更改都被应用到 repository 对象
+        return repository
+    }
 
     fun setRepository(repo: Repository) {
         repository = repo.copy()
         if (panel == null) {
             createPanel()
         }
+        updateCommandList()  // 更新命令列表
         panel?.reset()  // 重置面板以显示新的数据
+    }
+
+    // 更新命令列表
+    private fun updateCommandList() {
+        if (::listModel.isInitialized) {
+            listModel.clear()
+            repository.postSyncCommands.forEach { command ->
+                listModel.addElement(command)
+            }
+        }
     }
 
     // 更新命令列表到仓库对象

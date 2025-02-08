@@ -23,8 +23,8 @@ class RepositorySettingsDialog(
     
     init {
         title = "仓库设置"
-        init()
         panel.setRepository(repository.copy())
+        init()
     }
     
     override fun createCenterPanel(): JComponent {
@@ -37,7 +37,7 @@ class RepositorySettingsDialog(
         val buttonPanel = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.X_AXIS)
             border = BorderFactory.createEmptyBorder(10, 0, 0, 0)
-            add(JButton("查看原始配置").apply {
+            add(JButton("查看当前配置").apply {
                 addActionListener {
                     showRawConfig()
                 }
@@ -51,7 +51,7 @@ class RepositorySettingsDialog(
     private fun showRawConfig() {
         val dialog = object : DialogWrapper(currentProject) {
             init {
-                title = "原始配置"
+                title = "当前配置"
                 init()
             }
             
@@ -61,7 +61,8 @@ class RepositorySettingsDialog(
                     .serializeNulls()
                     .create()
                     
-                val jsonConfig = gson.toJson(repository)
+                // 使用 panel.getRepository() 获取当前编辑的配置
+                val jsonConfig = gson.toJson(panel.getRepository())
                 
                 val textArea = JTextArea(jsonConfig).apply {
                     isEditable = false
@@ -79,6 +80,12 @@ class RepositorySettingsDialog(
         }
         
         dialog.show()
+    }
+    
+    override fun doOKAction() {
+        // 在确认前确保所有数据都被保存
+        panel.getRepository()
+        super.doOKAction()
     }
     
     fun getRepository(): Repository = panel.getRepository()
