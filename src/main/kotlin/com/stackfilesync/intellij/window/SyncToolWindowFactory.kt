@@ -35,7 +35,7 @@ class SyncToolWindowFactory : ToolWindowFactory {
         
         // 创建日志面板的标题栏
         val logTitlePanel = JPanel(BorderLayout()).apply {
-            add(JLabel("同步日志"), BorderLayout.WEST)
+            add(JLabel("日志"), BorderLayout.WEST)
             add(JButton(AllIcons.Actions.GC).apply {  // 使用垃圾桶图标
                 toolTipText = "清除日志"
                 addActionListener {

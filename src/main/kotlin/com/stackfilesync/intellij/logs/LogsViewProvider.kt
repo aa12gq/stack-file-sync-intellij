@@ -131,7 +131,7 @@ class LogsViewProvider : ToolWindowFactory {
         // 创建工具窗口内容
         val content = ContentFactory.getInstance().createContent(
             panel,
-            "同步日志",  // 添加标题
+            "日志",  // 添加标题
             false
         )
         

@@ -94,6 +94,14 @@ class FileSyncManager(
             success = true
             logService.appendLog("\n✅ 同步完成")
             
+            // 如果是自动同步模式，显示下次执行时间
+            if (isAutoSync && repository.autoSync?.enabled == true) {
+                val interval = repository.autoSync?.interval ?: 300
+                val nextTime = System.currentTimeMillis() + (interval * 1000)
+                val nextTimeStr = java.text.SimpleDateFormat("HH:mm:ss").format(java.util.Date(nextTime))
+                logService.appendLog("\n仓库 [${repository.name}] 下次自动同步时间: $nextTimeStr")
+            }
+            
             // 在 EDT 线程上显示通知
             invokeLater {
                 NotificationUtils.showInfo(

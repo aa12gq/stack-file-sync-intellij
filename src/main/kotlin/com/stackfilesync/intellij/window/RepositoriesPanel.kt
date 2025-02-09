@@ -24,6 +24,9 @@ import javax.swing.JLabel
 import javax.swing.BorderFactory
 import java.awt.Dimension
 import com.intellij.openapi.options.ShowSettingsUtil
+import javax.swing.JCheckBox
+import com.stackfilesync.intellij.model.AutoSyncConfig
+import com.stackfilesync.intellij.sync.AutoSyncManager
 
 class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
     private val listModel = DefaultListModel<Repository>()
@@ -62,6 +65,44 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
         // 创建仓库列表面板
         val listPanel = JPanel(BorderLayout()).apply {
             add(JBScrollPane(repositoryList), BorderLayout.CENTER)
+            
+            // 添加自动同步复选框
+            val autoSyncPanel = JPanel(BorderLayout()).apply {
+                border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
+                val autoSyncCheckBox = JCheckBox("自动同步").apply {
+                    toolTipText = "开启后将使用全量同步模式，无需手动选择文件"
+                    addActionListener {
+                        val selected = repositoryList.selectedValue
+                        if (selected != null) {
+                            // 更新仓库配置
+                            val settings = SyncSettingsState.getInstance()
+                            val updatedRepo = selected.copy(
+                                autoSync = if (isSelected) AutoSyncConfig(enabled = true) else null
+                            )
+                            
+                            // 保存更新后的仓库配置
+                            val repos = settings.getRepositories().map { 
+                                if (it.name == updatedRepo.name) updatedRepo else it 
+                            }
+                            settings.setRepositories(repos)
+                            
+                            // 更新自动同步管理器
+                            val autoSyncManager = AutoSyncManager.getInstance(project)
+                            if (isSelected) {
+                                autoSyncManager.startAllAutoSync()
+                            } else {
+                                autoSyncManager.stopAllAutoSync()
+                                autoSyncManager.startAllAutoSync()
+                            }
+                            
+                            // 刷新列表
+                            loadRepositories()
+                        }
+                    }
+                }
+                add(autoSyncCheckBox, BorderLayout.EAST)
+            }
+            add(autoSyncPanel, BorderLayout.SOUTH)
         }
 
         // 创建底部操作按钮
@@ -102,6 +143,19 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
         add(toolbar, BorderLayout.NORTH)
         add(listPanel, BorderLayout.CENTER)
         add(buttonPanel, BorderLayout.SOUTH)
+
+        // 添加列表选择监听器
+        repositoryList.addListSelectionListener { e ->
+            if (!e.valueIsAdjusting) {
+                val selected = repositoryList.selectedValue
+                if (selected != null) {
+                    // 更新自动同步复选框状态
+                    val autoSyncCheckBox = (listPanel.components.last() as JPanel)
+                        .components.last() as JCheckBox
+                    autoSyncCheckBox.isSelected = selected.autoSync?.enabled ?: false
+                }
+            }
+        }
 
         // 加载仓库列表
         loadRepositories()
@@ -154,8 +208,24 @@ class RepositoryListCellRenderer : javax.swing.DefaultListCellRenderer() {
     ): java.awt.Component {
         super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
         if (value is Repository) {
-            text = value.name
+            // 显示仓库名称和自动同步状态
+            text = buildString {
+                append(value.name)
+                if (value.autoSync?.enabled == true) {
+                    append(" [自动同步已开启]")
+                }
+            }
             icon = AllIcons.Nodes.Module
+            
+            // 设置提示信息
+            toolTipText = buildString {
+                append("仓库: ${value.name}")
+                append("\n源目录: ${value.sourceDirectory}")
+                append("\n目标目录: ${value.targetDirectory}")
+                if (value.autoSync?.enabled == true) {
+                    append("\n自动同步: 已开启 (间隔: ${value.autoSync?.interval ?: 300}秒)")
+                }
+            }
         }
         return this
     }
