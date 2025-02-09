@@ -77,7 +77,11 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
                             // 更新仓库配置
                             val settings = SyncSettingsState.getInstance()
                             val updatedRepo = selected.copy(
-                                autoSync = if (isSelected) AutoSyncConfig(enabled = true) else null
+                                autoSync = if (isSelected) {
+                                    // 保留原有的时间间隔设置，如果没有则使用默认值
+                                    val currentInterval = selected.autoSync?.interval ?: 300
+                                    AutoSyncConfig(enabled = true, interval = currentInterval)
+                                } else null
                             )
                             
                             // 保存更新后的仓库配置
