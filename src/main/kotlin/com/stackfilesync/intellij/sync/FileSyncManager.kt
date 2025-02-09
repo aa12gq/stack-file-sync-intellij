@@ -31,6 +31,10 @@ import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.openapi.wm.ToolWindow
 import com.stackfilesync.intellij.logs.LogsViewProvider
 import com.stackfilesync.intellij.logs.LogService
+import javax.swing.JCheckBox
+import javax.swing.JLabel
+import javax.swing.JPanel
+import java.awt.BorderLayout
 
 class FileSyncManager(
     private val project: Project,
@@ -64,7 +68,12 @@ class FileSyncManager(
             indicator.isIndeterminate = true
             
             // 同步文件
-            syncFromGit(repository)
+            val syncResult = syncFromGit(repository)
+            // 如果同步被取消或没有选择文件，直接返回
+            if (!syncResult) {
+                logService.appendLog("\n同步已取消")
+                return
+            }
             
             // 在同步成功后执行后处理命令
             if (!repository.postSyncCommands.isNullOrEmpty()) {
@@ -143,7 +152,7 @@ class FileSyncManager(
         }
     }
 
-    private fun syncFromGit(repository: Repository) {
+    private fun syncFromGit(repository: Repository): Boolean {
         try {
             val gitDir = tempDir.resolve(repository.name)
             
@@ -152,9 +161,14 @@ class FileSyncManager(
             
             // 同步文件
             logService.appendLog("开始同步文件...")
-            syncFiles(repository, gitDir)
+            val syncSuccess = syncFiles(repository, gitDir)
             
-            logService.appendLog("文件同步完成")
+            if (syncSuccess) {
+                logService.appendLog("文件同步完成")
+                return true
+            }
+            
+            return false
             
         } catch (e: Exception) {
             val errorMessage = when (e) {
@@ -335,7 +349,7 @@ class FileSyncManager(
         }
     }
 
-    private fun syncFiles(repository: Repository, sourcePath: Path) {
+    private fun syncFiles(repository: Repository, sourcePath: Path): Boolean {
         try {
             val targetDir = getTargetDirectory(repository)
             val sourceDir = sourcePath.resolve(repository.sourceDirectory)
@@ -355,16 +369,26 @@ class FileSyncManager(
             
             // 获取要同步的文件
             indicator.text = "正在扫描文件..."
-            val files = findFilesToSync(sourceDir, repository)
+            val allFiles = findFilesToSync(sourceDir, repository)
             
-            if (files.isEmpty()) {
+            if (allFiles.isEmpty()) {
                 logService.appendLog("没有找到需要同步的文件")
-                return
+                return false
             }
 
-            logService.appendLog("找到 ${files.size} 个文件需要同步")
+            logService.appendLog("找到 ${allFiles.size} 个文件可以同步")
 
-            // 同步所有匹配的文件
+            // 让用户选择要同步的文件
+            val files = chooseFilesToSync(allFiles, sourceDir)
+            
+            if (files.isEmpty()) {
+                logService.appendLog("未选择任何文件，同步已取消")
+                return false
+            }
+
+            logService.appendLog("已选择 ${files.size} 个文件进行同步")
+
+            // 同步所有选中的文件
             indicator.isIndeterminate = false
             indicator.fraction = 0.0
             
@@ -399,6 +423,7 @@ class FileSyncManager(
             }
             
             logService.appendLog("✅ 成功同步 ${files.size} 个文件")
+            return true
             
         } catch (e: Exception) {
             val errorMessage = "同步失败: ${e.message}"
@@ -414,7 +439,28 @@ class FileSyncManager(
         // 在 EDT 线程上执行对话框操作
         ApplicationManager.getApplication().invokeAndWait {
             val dialog = object : DialogWrapper(project, true) {
-                private val checkBoxList = CheckBoxList<String>()
+                private val checkBoxList: CheckBoxList<String> = CheckBoxList<String>().apply {
+                    // 设置选择变更监听器
+                    addListSelectionListener { _ ->
+                        // 更新全选复选框状态
+                        val allSelected = (0 until itemsCount).all { i -> 
+                            val item = getItemAt(i) as String
+                            isItemSelected(item)
+                        }
+                        selectAllCheckBox.isSelected = allSelected
+                    }
+                }
+                
+                private val selectAllCheckBox: JCheckBox = JCheckBox("全选").apply {
+                    isSelected = true
+                    addActionListener { _ ->
+                        val selected = isSelected
+                        for (i in 0 until checkBoxList.itemsCount) {
+                            val item = checkBoxList.getItemAt(i) as String
+                            checkBoxList.setItemSelected(item, selected)
+                        }
+                    }
+                }
                 
                 init {
                     title = "选择要同步的文件"
@@ -428,14 +474,31 @@ class FileSyncManager(
                 }
                 
                 override fun createCenterPanel(): JComponent {
+                    val panel = JPanel(BorderLayout())
                     val scrollPane = JBScrollPane(checkBoxList)
-                    scrollPane.preferredSize = Dimension(400, 300)
-                    return scrollPane
+                    scrollPane.preferredSize = Dimension(500, 400)
+                    
+                    // 添加全选复选框和文件计数
+                    val topPanel = JPanel(BorderLayout()).apply {
+                        add(selectAllCheckBox, BorderLayout.WEST)
+                        add(JLabel("共 ${availableFiles.size} 个文件"), BorderLayout.EAST)
+                    }
+                    
+                    panel.add(topPanel, BorderLayout.NORTH)
+                    panel.add(scrollPane, BorderLayout.CENTER)
+                    return panel
                 }
                 
                 fun getSelectedFiles(): List<Path> {
-                    return checkBoxList.selectedIndices.map { index ->
-                        availableFiles[index]
+                    val selectedPaths = mutableListOf<String>()
+                    for (i in 0 until checkBoxList.itemsCount) {
+                        val item = checkBoxList.getItemAt(i) as String
+                        if (checkBoxList.isItemSelected(item)) {
+                            selectedPaths.add(item)
+                        }
+                    }
+                    return selectedPaths.mapNotNull { relativePath ->
+                        availableFiles.find { sourceDir.relativize(it).toString() == relativePath }
                     }
                 }
             }
