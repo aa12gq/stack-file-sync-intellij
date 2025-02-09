@@ -92,7 +92,6 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
                                 autoSyncManager.startAllAutoSync()
                             } else {
                                 autoSyncManager.stopAllAutoSync()
-                                autoSyncManager.startAllAutoSync()
                             }
                             
                             // 刷新列表
