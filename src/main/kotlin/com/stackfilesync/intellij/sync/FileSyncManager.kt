@@ -46,7 +46,13 @@ class FileSyncManager(
     private val backupManager = BackupManager(project)
     private val logService = LogService.getInstance(project)
 
-    fun sync(repository: Repository, showFileSelection: Boolean = true) {
+    /**
+     * 同步仓库文件
+     * @param repository 要同步的仓库
+     * @param showFileSelection 是否显示文件选择对话框
+     * @param isAutoSync 是否是自动同步
+     */
+    fun sync(repository: Repository, showFileSelection: Boolean = true, isAutoSync: Boolean = false) {
         val startTime = System.currentTimeMillis()
         var success = false
         var error: String? = null
@@ -62,13 +68,15 @@ class FileSyncManager(
             }
             
             logService.clear()
-            logService.appendLog("开始同步仓库: ${repository.name}")
+            logService.appendLog("开始${if (isAutoSync) "自动" else "手动"}同步仓库: ${repository.name}")
             
             indicator.text = "准备同步..."
             indicator.isIndeterminate = true
             
             // 同步文件
-            val syncResult = syncFromGit(repository, showFileSelection)
+            // 自动同步时强制使用全量同步模式
+            val actualShowFileSelection = if (isAutoSync) false else showFileSelection
+            val syncResult = syncFromGit(repository, actualShowFileSelection)
             // 如果同步被取消或没有选择文件，直接返回
             if (!syncResult) {
                 logService.appendLog("\n同步已取消")

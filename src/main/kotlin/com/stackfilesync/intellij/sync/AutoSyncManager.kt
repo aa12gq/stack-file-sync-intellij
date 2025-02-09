@@ -86,7 +86,7 @@ class AutoSyncManager(private val project: Project) {
                         override fun run(indicator: com.intellij.openapi.progress.ProgressIndicator) {
                             LOG.info("开始同步仓库 ${repository.name}")
                             val syncManager = FileSyncManager(project, indicator)
-                            syncManager.sync(repository)
+                            syncManager.sync(repository, showFileSelection = false, isAutoSync = true)
                             LOG.info("完成同步仓库 ${repository.name}")
                         }
                     })

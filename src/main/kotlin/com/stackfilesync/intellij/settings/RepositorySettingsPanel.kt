@@ -113,6 +113,7 @@ class RepositorySettingsPanel(private val project: Project) {
                             } else null
                         }
                         cell(autoSyncCheckBox)
+                            .comment("开启后将使用全量同步模式，无需手动选择文件")
                     }
                     
                     row("同步间隔(秒):") {
@@ -128,6 +129,7 @@ class RepositorySettingsPanel(private val project: Project) {
                                     }
                                 }
                             )
+                            .comment("设置自动同步的时间间隔，范围：0-3600秒")
                     }
                 }
                 

@@ -7,6 +7,14 @@
 - Added two sync modes:
   - Full Sync: Synchronize all files without selection dialog
   - Selective Sync: Choose specific files to synchronize
+- Improved auto-sync behavior:
+  - Auto-sync now uses Full Sync mode by default
+  - Manual sync supports both Full Sync and Selective Sync modes
+  - Auto-sync can be enabled for each repository individually
+  - Configurable sync interval (in seconds) for each repository
+  - Auto-sync starts immediately after enabling and runs at specified intervals
+  - Auto-sync status is preserved across IDE restarts
+  - Visual indicators show auto-sync status in repository list
 
 ## [1.0.0] - 2025-02-09
 

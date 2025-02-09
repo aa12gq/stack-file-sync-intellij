@@ -29,7 +29,7 @@ class SyncFilesAction : AnAction() {
         ProgressManager.getInstance().run(object : Task.Backgroundable(project, "同步文件", true) {
             override fun run(indicator: ProgressIndicator) {
                 val syncManager = FileSyncManager(project, indicator)
-                syncManager.sync(selectedRepo)
+                syncManager.sync(selectedRepo, showFileSelection = true, isAutoSync = false)
             }
         })
     }

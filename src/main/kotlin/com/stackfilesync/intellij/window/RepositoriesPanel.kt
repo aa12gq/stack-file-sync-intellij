@@ -122,7 +122,7 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
         loadRepositories()
     }
 
-    private fun startSync(repository: Repository, showFileSelection: Boolean) {
+    private fun startSync(repository: Repository, showFileSelection: Boolean = true) {
         isSyncing = true
         val syncButton = (buttonPanel.components.last() as JButton)
         val fullSyncButton = (buttonPanel.components[1] as JButton)
@@ -131,23 +131,16 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
         syncButton.text = "同步中..."
         fullSyncButton.text = "同步中..."
 
-        ProgressManager.getInstance().run(
-            object : Task.Backgroundable(project, "同步文件", false) {
-                override fun run(indicator: ProgressIndicator) {
-                    try {
-                        FileSyncManager(project, indicator).sync(repository, showFileSelection)
-                    } finally {
-                        invokeLater {
-                            isSyncing = false
-                            syncButton.isEnabled = true
-                            fullSyncButton.isEnabled = true
-                            syncButton.text = "选择性同步"
-                            fullSyncButton.text = "全量同步"
-                        }
-                    }
-                }
+        ProgressManager.getInstance().run(object : Task.Backgroundable(
+            project,
+            "同步文件",
+            false
+        ) {
+            override fun run(indicator: ProgressIndicator) {
+                val syncManager = FileSyncManager(project, indicator)
+                syncManager.sync(repository, showFileSelection, isAutoSync = false)
             }
-        )
+        })
     }
 }
 
