@@ -439,27 +439,9 @@ class FileSyncManager(
         // 在 EDT 线程上执行对话框操作
         ApplicationManager.getApplication().invokeAndWait {
             val dialog = object : DialogWrapper(project, true) {
-                private val checkBoxList: CheckBoxList<String> = CheckBoxList<String>().apply {
-                    // 设置选择变更监听器
-                    addListSelectionListener { _ ->
-                        // 更新全选复选框状态
-                        val allSelected = (0 until itemsCount).all { i -> 
-                            val item = getItemAt(i) as String
-                            isItemSelected(item)
-                        }
-                        selectAllCheckBox.isSelected = allSelected
-                    }
-                }
-                
-                private val selectAllCheckBox: JCheckBox = JCheckBox("全选").apply {
+                private val checkBoxList = CheckBoxList<String>()
+                private val selectAllCheckBox = JCheckBox("全选").apply {
                     isSelected = true
-                    addActionListener { _ ->
-                        val selected = isSelected
-                        for (i in 0 until checkBoxList.itemsCount) {
-                            val item = checkBoxList.getItemAt(i) as String
-                            checkBoxList.setItemSelected(item, selected)
-                        }
-                    }
                 }
                 
                 init {
@@ -470,6 +452,36 @@ class FileSyncManager(
                     availableFiles.forEach { file ->
                         val relativePath = sourceDir.relativize(file).toString()
                         checkBoxList.addItem(relativePath, relativePath, true)  // 默认全选
+                    }
+
+                    // 设置全选复选框的动作
+                    selectAllCheckBox.addActionListener {
+                        val selected = selectAllCheckBox.isSelected
+                        for (i in 0 until checkBoxList.itemsCount) {
+                            val item = checkBoxList.getItemAt(i)
+                            if (item is String) {
+                                checkBoxList.setItemSelected(item, selected)
+                            }
+                        }
+                        checkBoxList.repaint()
+                    }
+
+                    // 设置复选框列表的点击处理
+                    checkBoxList.setCheckBoxListListener { index, value ->
+                        val item = checkBoxList.getItemAt(index)
+                        if (item is String) {
+                            // 更新全选状态
+                            var allSelected = true
+                            for (i in 0 until checkBoxList.itemsCount) {
+                                val currentItem = checkBoxList.getItemAt(i)
+                                if (currentItem is String && !checkBoxList.isItemSelected(currentItem)) {
+                                    allSelected = false
+                                    break
+                                }
+                            }
+                            selectAllCheckBox.isSelected = allSelected
+                            checkBoxList.repaint()
+                        }
                     }
                 }
                 
@@ -492,8 +504,8 @@ class FileSyncManager(
                 fun getSelectedFiles(): List<Path> {
                     val selectedPaths = mutableListOf<String>()
                     for (i in 0 until checkBoxList.itemsCount) {
-                        val item = checkBoxList.getItemAt(i) as String
-                        if (checkBoxList.isItemSelected(item)) {
+                        val item = checkBoxList.getItemAt(i)
+                        if (item is String && checkBoxList.isItemSelected(item)) {
                             selectedPaths.add(item)
                         }
                     }
