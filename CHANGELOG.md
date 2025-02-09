@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+
+- Added two sync modes:
+  - Full Sync: Synchronize all files without selection dialog
+  - Selective Sync: Choose specific files to synchronize
+
 ## [1.0.0] - 2025-02-09
 
 ### Features

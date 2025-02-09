@@ -46,7 +46,7 @@ class FileSyncManager(
     private val backupManager = BackupManager(project)
     private val logService = LogService.getInstance(project)
 
-    fun sync(repository: Repository) {
+    fun sync(repository: Repository, showFileSelection: Boolean = true) {
         val startTime = System.currentTimeMillis()
         var success = false
         var error: String? = null
@@ -68,7 +68,7 @@ class FileSyncManager(
             indicator.isIndeterminate = true
             
             // 同步文件
-            val syncResult = syncFromGit(repository)
+            val syncResult = syncFromGit(repository, showFileSelection)
             // 如果同步被取消或没有选择文件，直接返回
             if (!syncResult) {
                 logService.appendLog("\n同步已取消")
@@ -152,7 +152,7 @@ class FileSyncManager(
         }
     }
 
-    private fun syncFromGit(repository: Repository): Boolean {
+    private fun syncFromGit(repository: Repository, showFileSelection: Boolean = true): Boolean {
         try {
             val gitDir = tempDir.resolve(repository.name)
             
@@ -161,7 +161,7 @@ class FileSyncManager(
             
             // 同步文件
             logService.appendLog("开始同步文件...")
-            val syncSuccess = syncFiles(repository, gitDir)
+            val syncSuccess = syncFiles(repository, gitDir, showFileSelection)
             
             if (syncSuccess) {
                 logService.appendLog("文件同步完成")
@@ -349,7 +349,7 @@ class FileSyncManager(
         }
     }
 
-    private fun syncFiles(repository: Repository, sourcePath: Path): Boolean {
+    private fun syncFiles(repository: Repository, sourcePath: Path, showFileSelection: Boolean = true): Boolean {
         try {
             val targetDir = getTargetDirectory(repository)
             val sourceDir = sourcePath.resolve(repository.sourceDirectory)
@@ -378,8 +378,12 @@ class FileSyncManager(
 
             logService.appendLog("找到 ${allFiles.size} 个文件可以同步")
 
-            // 让用户选择要同步的文件
-            val files = chooseFilesToSync(allFiles, sourceDir)
+            // 根据同步模式决定是否显示文件选择对话框
+            val files = if (showFileSelection) {
+                chooseFilesToSync(allFiles, sourceDir)
+            } else {
+                allFiles
+            }
             
             if (files.isEmpty()) {
                 logService.appendLog("未选择任何文件，同步已取消")
