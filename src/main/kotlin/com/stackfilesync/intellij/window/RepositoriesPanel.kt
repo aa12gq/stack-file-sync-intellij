@@ -27,6 +27,7 @@ import com.intellij.openapi.options.ShowSettingsUtil
 import javax.swing.JCheckBox
 import com.stackfilesync.intellij.model.AutoSyncConfig
 import com.stackfilesync.intellij.sync.AutoSyncManager
+import javax.swing.JFileChooser
 
 class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
     private val listModel = DefaultListModel<Repository>()
@@ -43,6 +44,111 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
             layout = BoxLayout(this, BoxLayout.X_AXIS)
             add(JLabel("仓库列表"))
             add(Box.createHorizontalGlue())
+            add(JButton(AllIcons.Actions.Download).apply {
+                toolTipText = "导入配置"
+                addActionListener {
+                    val fileChooser = JFileChooser().apply {
+                        fileSelectionMode = JFileChooser.FILES_ONLY
+                        fileFilter = javax.swing.filechooser.FileNameExtensionFilter(
+                            "JSON 文件 (*.json)", "json"
+                        )
+                    }
+                    if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+                        try {
+                            val file = fileChooser.selectedFile
+                            val json = file.readText()
+                            val settings = SyncSettingsState.getInstance()
+                            val repositories = com.google.gson.Gson().fromJson(
+                                json,
+                                Array<Repository>::class.java
+                            ).toList()
+                            settings.setRepositories(repositories)
+                            loadRepositories()
+                            com.intellij.openapi.ui.Messages.showInfoMessage(
+                                "成功导入 ${repositories.size} 个仓库配置",
+                                "导入成功"
+                            )
+                        } catch (e: Exception) {
+                            com.intellij.openapi.ui.Messages.showErrorDialog(
+                                "导入配置失败：${e.message}",
+                                "导入失败"
+                            )
+                        }
+                    }
+                }
+            })
+            add(Box.createHorizontalStrut(5))
+            add(JButton(AllIcons.Actions.Upload).apply {
+                toolTipText = "导出配置"
+                addActionListener {
+                    val selectedRepo = repositoryList.selectedValue
+                    val settings = SyncSettingsState.getInstance()
+                    val repositories = if (selectedRepo != null) {
+                        // 如果选中了仓库，只导出选中的仓库
+                        listOf(selectedRepo)
+                    } else {
+                        // 如果没有选中仓库，导出所有仓库
+                        settings.getRepositories()
+                    }
+                    
+                    // 如果没有可导出的仓库，显示提示
+                    if (repositories.isEmpty()) {
+                        com.intellij.openapi.ui.Messages.showWarningDialog(
+                            "没有可导出的仓库配置",
+                            "导出失败"
+                        )
+                        return@addActionListener
+                    }
+                    
+                    // 设置默认文件名
+                    val defaultFileName = if (selectedRepo != null) {
+                        "${selectedRepo.name}_config.json"
+                    } else {
+                        "all_repositories_config.json"
+                    }
+                    
+                    val fileChooser = JFileChooser().apply {
+                        fileSelectionMode = JFileChooser.FILES_ONLY
+                        selectedFile = java.io.File(defaultFileName)
+                        fileFilter = javax.swing.filechooser.FileNameExtensionFilter(
+                            "JSON 文件 (*.json)", "json"
+                        )
+                    }
+                    
+                    if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+                        try {
+                            var file = fileChooser.selectedFile
+                            // 如果文件名没有.json后缀，自动添加
+                            if (!file.name.toLowerCase().endsWith(".json")) {
+                                file = java.io.File(file.absolutePath + ".json")
+                            }
+                            
+                            val json = com.google.gson.GsonBuilder()
+                                .setPrettyPrinting()
+                                .create()
+                                .toJson(repositories)
+                            file.writeText(json)
+                            
+                            val message = if (selectedRepo != null) {
+                                "仓库 [${selectedRepo.name}] 的配置已导出到：${file.absolutePath}"
+                            } else {
+                                "所有仓库配置（共 ${repositories.size} 个）已导出到：${file.absolutePath}"
+                            }
+                            
+                            com.intellij.openapi.ui.Messages.showInfoMessage(
+                                message,
+                                "导出成功"
+                            )
+                        } catch (e: Exception) {
+                            com.intellij.openapi.ui.Messages.showErrorDialog(
+                                "导出配置失败：${e.message}",
+                                "导出失败"
+                            )
+                        }
+                    }
+                }
+            })
+            add(Box.createHorizontalStrut(5))
             add(JButton(AllIcons.Actions.Refresh).apply {
                 toolTipText = "刷新仓库列表"
                 addActionListener {
