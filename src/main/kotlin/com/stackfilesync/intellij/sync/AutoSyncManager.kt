@@ -33,21 +33,42 @@ class AutoSyncManager(private val project: Project) {
     
     init {
         LOG.info("初始化 AutoSyncManager")
-        // 启动所有自动同步任务
-        startAllAutoSync()
-        
         // 注册设置变更监听器
         ApplicationManager.getApplication().messageBus.connect().subscribe(
             SyncSettingsState.SETTINGS_CHANGED,
             object : SyncSettingsState.SettingsChangeListener {
                 override fun settingsChanged() {
                     LOG.info("收到设置变更事件")
-                    ApplicationManager.getApplication().invokeLater {
-                        startAllAutoSync()
+                    // 不再自动调用 startAllAutoSync，而是检查变更
+                    val repositories = settings.getRepositories()
+                    repositories.forEach { repo ->
+                        val currentTask = syncTasks[repo.name]
+                        if (repo.autoSync?.enabled == true) {
+                            // 如果任务不存在或已取消，才启动新任务
+                            if (currentTask == null || currentTask.isCancelled) {
+                                LOG.info("启动仓库 ${repo.name} 的自动同步，间隔: ${repo.autoSync?.interval ?: 300}秒")
+                                startAutoSync(repo)
+                            }
+                        } else {
+                            // 如果任务存在且未取消，停止任务
+                            if (currentTask != null && !currentTask.isCancelled) {
+                                LOG.info("停止仓库 ${repo.name} 的自动同步")
+                                stopAutoSync(repo)
+                            }
+                        }
                     }
                 }
             }
         )
+        
+        // 初始化时检查并启动已启用的自动同步任务
+        val repositories = settings.getRepositories()
+        repositories.forEach { repo ->
+            if (repo.autoSync?.enabled == true) {
+                LOG.info("初始化时启动仓库 ${repo.name} 的自动同步")
+                startAutoSync(repo)
+            }
+        }
     }
     
     fun startAllAutoSync() {
@@ -70,7 +91,7 @@ class AutoSyncManager(private val project: Project) {
         }
     }
     
-    private fun startAutoSync(repository: Repository) {
+    fun startAutoSync(repository: Repository) {
         val interval = repository.autoSync?.interval?.toLong() ?: 300L // 默认5分钟
         
         val future = executor.scheduleWithFixedDelay({

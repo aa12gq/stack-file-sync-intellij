@@ -190,19 +190,11 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
                                 } else null
                             )
                             
-                            // 保存更新后的仓库配置
+                            // 更新配置，设置变更监听器会处理自动同步的启动和停止
                             val repos = settings.getRepositories().map { 
                                 if (it.name == updatedRepo.name) updatedRepo else it 
                             }
                             settings.setRepositories(repos)
-                            
-                            // 更新自动同步管理器
-                            val autoSyncManager = AutoSyncManager.getInstance(project)
-                            if (isSelected) {
-                                autoSyncManager.startAllAutoSync()
-                            } else {
-                                autoSyncManager.stopAllAutoSync()
-                            }
                             
                             // 刷新列表
                             loadRepositories()
