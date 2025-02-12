@@ -1,0 +1,5 @@
+<idea-plugin>
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- 可以添加依赖 platform-images 插件时才需要的扩展点 -->
+    </extensions>
+</idea-plugin> 

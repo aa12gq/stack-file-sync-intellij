@@ -11,7 +11,7 @@ dependencies {
 }
 
 group = "com.stackfilesync"
-version = "1.0-SNAPSHOT"
+version = "1.0.1"
 
 repositories {
     mavenCentral()
@@ -22,14 +22,14 @@ repositories {
 // Configure Gradle IntelliJ Plugin
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
 intellij {
-    version.set("2023.3.4") // 指定具体版本
-    type.set("IC") // IC 表示 IntelliJ IDEA Community Edition
+    version.set("2023.3.4")
+    type.set("IC")
     plugins.set(listOf(
-        "Git4Idea",  // 注意大小写
-        "java",      // Java 插件依赖
-        "platform-images"  // 添加图标支持
+        "Git4Idea",
+        "java",
+        "platform-images"  // 移除版本号
     ))
-    updateSinceUntilBuild.set(false)  // 禁用版本限制
+    updateSinceUntilBuild.set(false)
 }
 
 tasks {
@@ -44,8 +44,35 @@ tasks {
 
     patchPluginXml {
         version.set(project.version.toString())
-        sinceBuild.set("233")  // 更新为当前IntelliJ版本
+        sinceBuild.set("233")
         untilBuild.set("241.*")
+        // 添加插件描述
+        pluginDescription.set("""
+            A powerful plugin for synchronizing files and code snippets between multiple projects.
+            
+            Features:
+            - Real-time file synchronization
+            - Configurable auto-sync intervals
+            - Multi-repository support
+            - Secure file backup
+            - High-performance file transfer
+            - Customizable sync rules
+            - Detailed sync logs
+            
+            For more information, visit: https://github.com/aa12gq/stack-file-sync-intellij
+        """.trimIndent())
+        // 添加更新说明
+        changeNotes.set("""
+            <ul>
+                <li>1.0.1
+                    <ul>
+                        <li>Added import/export configuration feature</li>
+                        <li>Fixed auto-sync issues</li>
+                        <li>Improved UI experience</li>
+                    </ul>
+                </li>
+            </ul>
+        """.trimIndent())
     }
 
     signPlugin {

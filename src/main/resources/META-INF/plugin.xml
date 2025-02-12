@@ -72,7 +72,7 @@
     <depends>Git4Idea</depends>
     <depends>com.intellij.modules.java</depends>
     <depends>com.intellij.modules.lang</depends>
-    <depends optional="true">com.intellij.platform.images</depends>
+    <depends optional="true" config-file="withImages.xml">com.intellij.platform.images</depends>
 
     <!-- Extension points defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
