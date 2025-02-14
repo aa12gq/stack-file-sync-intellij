@@ -46,33 +46,6 @@ tasks {
         version.set(project.version.toString())
         sinceBuild.set("233")
         untilBuild.set("241.*")
-        // 添加插件描述
-        pluginDescription.set("""
-            A powerful plugin for synchronizing files and code snippets between multiple projects.
-            
-            Features:
-            - Real-time file synchronization
-            - Configurable auto-sync intervals
-            - Multi-repository support
-            - Secure file backup
-            - High-performance file transfer
-            - Customizable sync rules
-            - Detailed sync logs
-            
-            For more information, visit: https://github.com/aa12gq/stack-file-sync-intellij
-        """.trimIndent())
-        // 添加更新说明
-        changeNotes.set("""
-            <ul>
-                <li>1.0.1
-                    <ul>
-                        <li>Added import/export configuration feature</li>
-                        <li>Fixed auto-sync issues</li>
-                        <li>Improved UI experience</li>
-                    </ul>
-                </li>
-            </ul>
-        """.trimIndent())
     }
 
     signPlugin {

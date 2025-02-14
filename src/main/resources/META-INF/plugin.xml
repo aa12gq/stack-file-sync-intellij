@@ -21,13 +21,41 @@
         
         <h2>Key Features</h2>
         <ul>
-            <li>🔄 Real-time file synchronization</li>
-            <li>🕒 Configurable auto-sync intervals</li>
-            <li>📁 Multi-repository support</li>
-            <li>🔒 Secure file backup</li>
-            <li>⚡ High-performance file transfer</li>
-            <li>🛠 Customizable sync rules</li>
-            <li>📊 Detailed sync logs</li>
+            <li>🔄 Real-time File Sync
+                <ul>
+                    <li>Full sync and selective sync support</li>
+                    <li>File pattern filtering</li>
+                    <li>Automatic backup</li>
+                </ul>
+            </li>
+            <li>⚡ Auto Sync
+                <ul>
+                    <li>Configurable sync intervals</li>
+                    <li>Per-repository configuration</li>
+                    <li>Auto-restore after IDE restart</li>
+                </ul>
+            </li>
+            <li>📁 Multi-Repository
+                <ul>
+                    <li>Multiple Git repositories support</li>
+                    <li>Different branch support</li>
+                    <li>Import/Export configurations</li>
+                </ul>
+            </li>
+            <li>🛠 Post-Sync Commands
+                <ul>
+                    <li>Automatic command execution after sync</li>
+                    <li>Multiple commands in sequence</li>
+                    <li>Custom execution directory</li>
+                </ul>
+            </li>
+            <li>📊 Sync Logging
+                <ul>
+                    <li>Real-time progress display</li>
+                    <li>Detailed operation logs</li>
+                    <li>Error notifications</li>
+                </ul>
+            </li>
         </ul>
 
         <h2>How to Use</h2>
@@ -42,27 +70,52 @@
         <h3>Repository Settings</h3>
         <ul>
             <li><strong>Name</strong>: Unique identifier for the repository</li>
-            <li><strong>Local Path</strong>: Local folder path to sync</li>
-            <li><strong>Remote Path</strong>: Remote sync target path</li>
-            <li><strong>Sync Rules</strong>: File include/exclude patterns</li>
-            <li><strong>Auto Sync</strong>: Enable/disable auto sync feature</li>
+            <li><strong>Git URL</strong>: Remote Git repository URL</li>
+            <li><strong>Branch</strong>: Git branch to sync from</li>
+            <li><strong>Source Directory</strong>: Directory in repository to sync</li>
+            <li><strong>Target Directory</strong>: Local directory to sync to</li>
+            <li><strong>File Patterns</strong>: File include/exclude patterns</li>
         </ul>
 
         <h3>Auto Sync Settings</h3>
         <ul>
             <li><strong>Enable Status</strong>: Turn auto sync on/off</li>
             <li><strong>Sync Interval</strong>: Set auto sync time interval (seconds)</li>
-            <li><strong>Sync Mode</strong>: Choose one-way or two-way sync</li>
+            <li><strong>Sync Mode</strong>: Full sync mode</li>
+        </ul>
+
+        <h3>Post-Sync Commands</h3>
+        <ul>
+            <li><strong>Order</strong>: Command execution order</li>
+            <li><strong>Directory</strong>: Command execution directory</li>
+            <li><strong>Command</strong>: Command to execute</li>
         </ul>
     ]]></description>
 
     <!-- Change notes for the plugin. -->
     <change-notes><![CDATA[
-        Initial release:
-        - Basic file synchronization
-        - Auto sync support
-        - Backup functionality
-        - UI components
+        <ul>
+            <li>1.0.1
+                <ul>
+                    <li>Added import/export configuration feature</li>
+                    <li>Fixed auto-sync issues</li>
+                    <li>Improved UI experience</li>
+                    <li>Enhanced log display format</li>
+                </ul>
+            </li>
+            <li>1.0.0
+                <ul>
+                    <li>Support syncing files from Git repositories to local directories</li>
+                    <li>Support selective file synchronization</li>
+                    <li>Support file filtering patterns</li>
+                    <li>Support automatic synchronization</li>
+                    <li>Support custom post-sync commands</li>
+                    <li>Support automatic file backup</li>
+                    <li>Support sync history tracking</li>
+                    <li>Support detailed sync logging</li>
+                </ul>
+            </li>
+        </ul>
     ]]></change-notes>
 
     <!-- Product and plugin compatibility requirements.
