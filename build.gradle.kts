@@ -23,7 +23,7 @@ dependencies {
 }
 
 group = "com.stackfilesync"
-version = "1.0.1"
+version = "1.1.0"
 
 repositories {
     mavenCentral()
@@ -68,6 +68,31 @@ tasks {
         version.set(project.version.toString())
         sinceBuild.set("223")
         untilBuild.set("241.*")
+        
+        changeNotes.set("""
+            <h3>1.1.0</h3>
+            <ul>
+                <li>Added P2P file transfer functionality</li>
+                <li>Added P2P node configuration</li>
+                <li>Support custom file receive directory</li>
+                <li>Added file transfer progress display</li>
+                <li>Support batch file transfer</li>
+            </ul>
+            
+            <h3>1.0.1</h3>
+            <ul>
+                <li>Fixed known issues</li>
+                <li>Improved user interface</li>
+            </ul>
+            
+            <h3>1.0.0</h3>
+            <ul>
+                <li>Initial release</li>
+                <li>Support file synchronization</li>
+                <li>Support auto sync</li>
+                <li>Support sync history</li>
+            </ul>
+        """.trimIndent())
     }
 
     signPlugin {

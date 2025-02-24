@@ -14,81 +14,22 @@
          Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
     <description><![CDATA[
-        <h1>Stack File Sync</h1>
-        <p>A powerful plugin for synchronizing files and code snippets between multiple projects. It provides a simple and flexible way to manage and sync your code assets.</p>
-        
-        <p><img src="https://raw.githubusercontent.com/aa12gq/stack-file-sync-intellij/main/docs/images/demonstration.gif" alt="Demonstration" width="800"/></p>
-        
-        <h2>Key Features</h2>
+        Stack File Sync is a powerful plugin for file synchronization and transfer.
+        <br>
+        <br>
+        Key Features:
         <ul>
-            <li>🔄 Real-time File Sync
-                <ul>
-                    <li>Full sync and selective sync support</li>
-                    <li>File pattern filtering</li>
-                    <li>Automatic backup</li>
-                </ul>
-            </li>
-            <li>⚡ Auto Sync
-                <ul>
-                    <li>Configurable sync intervals</li>
-                    <li>Per-repository configuration</li>
-                    <li>Auto-restore after IDE restart</li>
-                </ul>
-            </li>
-            <li>📁 Multi-Repository
-                <ul>
-                    <li>Multiple Git repositories support</li>
-                    <li>Different branch support</li>
-                    <li>Import/Export configurations</li>
-                </ul>
-            </li>
-            <li>🛠 Post-Sync Commands
-                <ul>
-                    <li>Automatic command execution after sync</li>
-                    <li>Multiple commands in sequence</li>
-                    <li>Custom execution directory</li>
-                </ul>
-            </li>
-            <li>📊 Sync Logging
-                <ul>
-                    <li>Real-time progress display</li>
-                    <li>Detailed operation logs</li>
-                    <li>Error notifications</li>
-                </ul>
-            </li>
+            <li>File Sync: Sync files with remote repositories</li>
+            <li>Auto Sync: Configure automatic sync rules</li>
+            <li>P2P Transfer: Support peer-to-peer file transfer</li>
+            <li>History: Track all sync and transfer activities</li>
         </ul>
-
-        <h2>How to Use</h2>
-        <ol>
-            <li>After installation, open the configuration panel via <code>Tools -> Stack File Sync -> Configure</code></li>
-            <li>Add new sync repository</li>
-            <li>Configure sync rules and auto-sync options</li>
-            <li>Click the sync button in the toolbar to start syncing</li>
-        </ol>
-
-        <h2>Configuration</h2>
-        <h3>Repository Settings</h3>
+        <br>
+        How to Use:
         <ul>
-            <li><strong>Name</strong>: Unique identifier for the repository</li>
-            <li><strong>Git URL</strong>: Remote Git repository URL</li>
-            <li><strong>Branch</strong>: Git branch to sync from</li>
-            <li><strong>Source Directory</strong>: Directory in repository to sync</li>
-            <li><strong>Target Directory</strong>: Local directory to sync to</li>
-            <li><strong>File Patterns</strong>: File include/exclude patterns</li>
-        </ul>
-
-        <h3>Auto Sync Settings</h3>
-        <ul>
-            <li><strong>Enable Status</strong>: Turn auto sync on/off</li>
-            <li><strong>Sync Interval</strong>: Set auto sync time interval (seconds)</li>
-            <li><strong>Sync Mode</strong>: Full sync mode</li>
-        </ul>
-
-        <h3>Post-Sync Commands</h3>
-        <ul>
-            <li><strong>Order</strong>: Command execution order</li>
-            <li><strong>Directory</strong>: Command execution directory</li>
-            <li><strong>Command</strong>: Command to execute</li>
+            <li>Right-click files in Project view or Editor</li>
+            <li>Click "Sync Files" or "P2P Transfer"</li>
+            <li>Configure sync and P2P nodes in Tools menu</li>
         </ul>
     ]]></description>
 
@@ -183,44 +124,44 @@
         <projectService 
             serviceImplementation="com.stackfilesync.intellij.service.P2PTransferService"/>
         
-        <!-- 添加节点配置服务 -->
+        <!-- 节点配置服务 -->
         <projectService 
             serviceImplementation="com.stackfilesync.intellij.service.P2PNodeConfigService"/>
     </extensions>
 
     <actions>
-        <!-- 同步文件动作 -->
+        <!-- Sync Files Action -->
         <action id="StackFileSync.SyncFiles" 
                 class="com.stackfilesync.intellij.actions.SyncFilesAction"
                 icon="/icons/sync.svg"
-                text="同步文件"
-                description="同步远程仓库文件">
+                text="Sync Files"
+                description="Sync files with remote repository">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt S"/>
         </action>
         
-        <!-- 配置同步动作 -->
+        <!-- Configure Action -->
         <action id="StackFileSync.Configure"
                 class="com.stackfilesync.intellij.actions.ConfigureAction"
-                text="配置同步"
-                description="配置同步设置">
+                text="Configure Sync"
+                description="Configure sync settings">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt COMMA"/>
         </action>
         
-        <!-- 自动同步动作 -->
+        <!-- Auto Sync Action -->
         <action id="StackFileSync.ToggleAutoSync"
                 class="com.stackfilesync.intellij.actions.ToggleAutoSyncAction"
-                text="切换自动同步"
-                description="启用/禁用自动同步">
+                text="Toggle Auto Sync"
+                description="Enable/Disable auto sync">
             <add-to-group group-id="StackFileSync.RepositoryActions" anchor="last"/>
         </action>
         
-        <!-- P2P传输动作 -->
+        <!-- P2P Transfer Action -->
         <action id="P2PTransfer" 
                 class="com.stackfilesync.intellij.actions.P2PTransferAction"
-                text="P2P传输"
-                description="将文件传输给其他用户">
+                text="P2P Transfer"
+                description="Transfer files to other users">
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <add-to-group group-id="EditorTabPopupMenu" anchor="last"/>
@@ -229,11 +170,11 @@
             <keyboard-shortcut keymap="$default" first-keystroke="control alt P"/>
         </action>
         
-        <!-- P2P配置动作 -->
+        <!-- P2P Config Action -->
         <action id="StackFileSync.P2PConfig" 
                 class="com.stackfilesync.intellij.actions.P2PConfigAction"
-                text="P2P 节点配置"
-                description="配置 P2P 节点">
+                text="P2P Node Config"
+                description="Configure P2P nodes">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
     </actions>

@@ -16,7 +16,31 @@
   - Auto-sync status is preserved across IDE restarts
   - Visual indicators show auto-sync status in repository list
 
-## [1.0.0] - 2025-02-09
+## [1.1.0] - 2024-02-20
+
+### Added
+
+- P2P file transfer functionality
+  - Support peer-to-peer file transfer between IDE instances
+  - Custom file receive directory configuration
+  - File transfer progress display
+  - Batch file transfer support
+  - P2P node management
+  - Auto-accept file transfer option
+
+## [1.0.1] - 2024-02-15
+
+### Added
+
+- Import/export configuration feature
+- Enhanced log display format
+
+### Fixed
+
+- Auto-sync issues
+- UI experience improvements
+
+## [1.0.0] - 2024-02-09
 
 ### Features
 
@@ -44,6 +68,6 @@
 
 ### Technical
 
-- Built with Kotlin 1.9.24
-- Using Gradle IntelliJ Plugin 1.17.2
-- Compatible with IntelliJ IDEA 2023.3 and above
+- Built with Kotlin 1.8.21
+- Using Gradle IntelliJ Plugin 1.13.3
+- Compatible with IntelliJ IDEA 2022.3 and above
