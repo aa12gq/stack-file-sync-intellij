@@ -127,6 +127,12 @@
     <depends>com.intellij.modules.lang</depends>
     <depends optional="true" config-file="withImages.xml">com.intellij.platform.images</depends>
 
+    <!-- 版本兼容性配置 -->
+    <idea-version since-build="223.0" until-build="241.*"/>  <!-- 支持 2022.3 到 2024.1 的版本 -->
+    
+    <!-- 如果需要支持更老的版本，可以设置更低的 since-build -->
+    <!-- <idea-version since-build="213.0" until-build="241.*"/> -->  <!-- 支持 2021.3 到 2024.1 的版本 -->
+
     <!-- Extension points defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
@@ -168,6 +174,18 @@
         <!-- 日志服务 -->
         <projectService 
             serviceImplementation="com.stackfilesync.intellij.logs.LogService"/>
+        
+        <!-- 添加传输历史服务 -->
+        <projectService 
+            serviceImplementation="com.stackfilesync.intellij.service.P2PTransferHistoryService"/>
+        
+        <!-- P2P传输服务 -->
+        <projectService 
+            serviceImplementation="com.stackfilesync.intellij.service.P2PTransferService"/>
+        
+        <!-- 添加节点配置服务 -->
+        <projectService 
+            serviceImplementation="com.stackfilesync.intellij.service.P2PNodeConfigService"/>
     </extensions>
 
     <actions>
@@ -196,6 +214,27 @@
                 text="切换自动同步"
                 description="启用/禁用自动同步">
             <add-to-group group-id="StackFileSync.RepositoryActions" anchor="last"/>
+        </action>
+        
+        <!-- P2P传输动作 -->
+        <action id="P2PTransfer" 
+                class="com.stackfilesync.intellij.actions.P2PTransferAction"
+                text="P2P传输"
+                description="将文件传输给其他用户">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="EditorTabPopupMenu" anchor="last"/>
+            <add-to-group group-id="ProjectViewPopupMenuModifyGroup" anchor="last"/>
+            <add-to-group group-id="ConsoleEditorPopupMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="control alt P"/>
+        </action>
+        
+        <!-- P2P配置动作 -->
+        <action id="StackFileSync.P2PConfig" 
+                class="com.stackfilesync.intellij.actions.P2PConfigAction"
+                text="P2P 节点配置"
+                description="配置 P2P 节点">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
     </actions>
 </idea-plugin>

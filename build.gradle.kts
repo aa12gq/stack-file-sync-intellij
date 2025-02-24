@@ -1,7 +1,19 @@
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "1.9.24"
-    id("org.jetbrains.intellij") version "1.17.2"
+    id("org.jetbrains.kotlin.jvm") version "1.8.21"
+    id("org.jetbrains.intellij") version "1.13.3"
+}
+
+// JVM 参数以支持 TLS
+allprojects {
+    tasks.withType<JavaCompile> {
+        options.compilerArgs.add("-Dhttps.protocols=TLSv1.2,TLSv1.3")
+    }
+}
+
+// 配置 Gradle JVM 参数
+tasks.withType<Test> {
+    systemProperty("https.protocols", "TLSv1.2,TLSv1.3")
 }
 
 dependencies {
@@ -15,21 +27,25 @@ version = "1.0.1"
 
 repositories {
     mavenCentral()
-    maven { url = uri("https://www.jetbrains.com/intellij-repository/releases") }
-    maven { url = uri("https://cache-redirector.jetbrains.com/intellij-dependencies") }
+    // 阿里云镜像源作为备选
+    maven {
+        url = uri("https://maven.aliyun.com/repository/public")
+    }
+    maven {
+        url = uri("https://maven.aliyun.com/repository/gradle-plugin")
+    }
 }
 
 // Configure Gradle IntelliJ Plugin
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
 intellij {
-    version.set("2023.3.4")
+    version.set("2022.3")
     type.set("IC")
     plugins.set(listOf(
         "Git4Idea",
         "java",
-        "platform-images"  // 移除版本号
+        "platform-images"
     ))
-    updateSinceUntilBuild.set(false)
 }
 
 tasks {
@@ -37,14 +53,20 @@ tasks {
     withType<JavaCompile> {
         sourceCompatibility = "17"
         targetCompatibility = "17"
+        options.encoding = "UTF-8"
     }
     withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-        kotlinOptions.jvmTarget = "17"
+        kotlinOptions {
+            jvmTarget = "17"
+            languageVersion = "1.7"
+            apiVersion = "1.7"
+            freeCompilerArgs = listOf("-Xjsr305=strict")
+        }
     }
 
     patchPluginXml {
         version.set(project.version.toString())
-        sinceBuild.set("233")
+        sinceBuild.set("223")
         untilBuild.set("241.*")
     }
 
