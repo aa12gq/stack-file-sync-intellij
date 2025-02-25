@@ -15,6 +15,9 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.DocumentAdapter
 import javax.swing.event.DocumentEvent
+import java.net.NetworkInterface
+import java.net.ServerSocket
+import java.net.InetAddress
 
 class P2PNodeConfigDialog(
     project: Project,
@@ -75,15 +78,79 @@ class P2PNodeConfigDialog(
     init {
         title = if (nodeConfig.name.isEmpty()) "添加新节点" else "编辑节点"
         
-        // 初始化字段值
+        // 如果是新建节点，自动填充IP地址和端口
+        if (nodeConfig.name.isEmpty()) {
+            val (address, port) = getLocalAddressAndPort()
+            addressField.text = address
+            portField.text = port.toString()
+        } else {
+            // 初始化字段值
+            addressField.text = nodeConfig.address
+            portField.text = if (nodeConfig.port > 0) nodeConfig.port.toString() else ""
+        }
+        
+        // 其他字段的初始化
         nameField.text = nodeConfig.name
-        addressField.text = nodeConfig.address
-        portField.text = if (nodeConfig.port > 0) nodeConfig.port.toString() else ""
         directoryChooser.text = nodeConfig.targetDirectory
         patternsField.text = nodeConfig.filePatterns.joinToString(",")
         excludePatternsField.text = nodeConfig.excludePatterns.joinToString(",")
         
         init()
+    }
+
+    // 添加获取本地IP地址和可用端口的方法
+    private fun getLocalAddressAndPort(): Pair<String, Int> {
+        // 获取本机IP地址
+        val address = NetworkInterface.getNetworkInterfaces().asSequence()
+            .flatMap { it.inetAddresses.asSequence() }
+            .filterNot { it.isLoopbackAddress }
+            .firstOrNull { it.isSiteLocalAddress }
+            ?.hostAddress ?: "localhost"
+
+        // 获取可用端口
+        val port = findAvailablePort()
+
+        return address to port
+    }
+
+    // 查找可用端口
+    private fun findAvailablePort(startPort: Int = 8001): Int {
+        for (port in startPort..65535) {
+            try {
+                ServerSocket(port).use {
+                    return port
+                }
+            } catch (e: Exception) {
+                continue
+            }
+        }
+        throw RuntimeException("无法找到可用端口")
+    }
+
+    // 添加刷新IP地址和端口的按钮
+    private fun createAddressPanel(): JPanel {
+        return JPanel(BorderLayout(5, 0)).apply {
+            val addressPanel = JPanel(BorderLayout(5, 0))
+            addressPanel.add(JBLabel("监听地址:"), BorderLayout.WEST)
+            addressPanel.add(addressField, BorderLayout.CENTER)
+            
+            // 添加刷新按钮
+            val refreshButton = JButton("刷新").apply {
+                toolTipText = "重新获取本机IP地址"
+                addActionListener {
+                    val (address, port) = getLocalAddressAndPort()
+                    addressField.text = address
+                    if (portField.text.isBlank()) {
+                        portField.text = port.toString()
+                    }
+                }
+            }
+            addressPanel.add(refreshButton, BorderLayout.EAST)
+            
+            add(addressPanel, BorderLayout.CENTER)
+            alignmentX = Component.LEFT_ALIGNMENT
+            maximumSize = Dimension(Int.MAX_VALUE, addressField.preferredSize.height)
+        }
     }
 
     override fun createCenterPanel(): JComponent {
@@ -97,7 +164,8 @@ class P2PNodeConfigDialog(
             add(createSettingsGroup("基本设置") {
                 add(createLabeledField("节点名称:", nameField))
                 add(Box.createVerticalStrut(5))
-                add(createLabeledField("监听地址:", addressField))
+                // 使用新的地址面板替换原来的地址字段
+                add(createAddressPanel())
                 add(Box.createVerticalStrut(5))
                 add(createLabeledField("监听端口:", portField))
             })
