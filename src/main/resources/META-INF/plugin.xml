@@ -80,7 +80,7 @@
         <!-- 工具窗口 -->
         <toolWindow id="Stack File Sync" 
                    secondary="true"
-                   icon="/icons/logo.svg"
+                   icon="/icons/logo_13.png"
                    anchor="right"
                    factoryClass="com.stackfilesync.intellij.window.SyncToolWindowFactory"/>
                    

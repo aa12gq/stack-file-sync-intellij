@@ -16,7 +16,7 @@
   - Auto-sync status is preserved across IDE restarts
   - Visual indicators show auto-sync status in repository list
 
-## [1.2.0] - 2024-03-21
+## [1.2.0] - 2025-03-21
 
 ### Added
 
@@ -51,7 +51,7 @@
 - Fixed subdirectory files sometimes not being matched properly
 - Fixed several HTTPS authentication-related stability issues
 
-## [1.1.0] - 2024-02-20
+## [1.1.0] - 2025-02-20
 
 ### Added
 
@@ -63,7 +63,7 @@
   - P2P node management
   - Auto-accept file transfer option
 
-## [1.0.1] - 2024-02-15
+## [1.0.1] - 2025-02-15
 
 ### Added
 
@@ -75,7 +75,7 @@
 - Auto-sync issues
 - UI experience improvements
 
-## [1.0.0] - 2024-02-09
+## [1.0.0] - 2025-02-09
 
 ### Features
 

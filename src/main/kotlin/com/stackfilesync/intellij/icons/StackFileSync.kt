@@ -5,7 +5,7 @@ import javax.swing.Icon
 
 object StackFileSync {
     @JvmField
-    val Logo = IconLoader.getIcon("/icons/logo.svg", StackFileSync::class.java)
+    val Logo = IconLoader.getIcon("/icons/logo.png", StackFileSync::class.java)
     
     @JvmField
     val Sync = IconLoader.getIcon("/icons/sync.svg", StackFileSync::class.java)
