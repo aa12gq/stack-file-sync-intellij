@@ -56,7 +56,14 @@ class SyncStateService(private val project: Project) {
         syncInProgress = false
         invokeLater {
             syncButtons.forEach { button ->
-                button.text = "同步"
+                // 根据按钮原始功能恢复其文本
+                if (button.actionCommand == "selectiveSync") {
+                    button.text = "选择性同步"
+                } else if (button.actionCommand == "fullSync") {
+                    button.text = "全量同步"
+                } else {
+                    button.text = "同步"
+                }
                 button.isEnabled = true
             }
         }

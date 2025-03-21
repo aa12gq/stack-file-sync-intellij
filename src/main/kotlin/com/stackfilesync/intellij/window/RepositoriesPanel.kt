@@ -35,8 +35,9 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
         selectionMode = ListSelectionModel.SINGLE_SELECTION
         cellRenderer = RepositoryListCellRenderer()
     }
-    private var isSyncing = false
-    private lateinit var buttonPanel: JPanel
+    
+    var isSyncing = false
+    val buttonPanel: JPanel
 
     init {
         // 创建顶部工具栏
@@ -292,10 +293,45 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
             false
         ) {
             override fun run(indicator: ProgressIndicator) {
-                val syncManager = FileSyncManager(project, indicator)
-                syncManager.sync(repository, showFileSelection, isAutoSync = false)
+                try {
+                    val syncManager = FileSyncManager(project, indicator)
+                    syncManager.sync(repository, showFileSelection, isAutoSync = false)
+                } finally {
+                    // 确保在任务完成后（无论成功还是失败）重置按钮状态
+                    invokeLater {
+                        isSyncing = false
+                        syncButton.isEnabled = true
+                        fullSyncButton.isEnabled = true
+                        syncButton.text = "选择性同步"
+                        fullSyncButton.text = "全量同步"
+                    }
+                }
+            }
+
+            // 覆盖onFinished方法确保任务结束后UI更新
+            override fun onFinished() {
+                super.onFinished()
+                invokeLater {
+                    isSyncing = false
+                    syncButton.isEnabled = true
+                    fullSyncButton.isEnabled = true
+                    syncButton.text = "选择性同步"
+                    fullSyncButton.text = "全量同步"
+                }
             }
         })
+    }
+
+    fun resetSyncButtons() {
+        invokeLater {
+            isSyncing = false
+            val syncButton = (buttonPanel.components.last() as JButton)
+            val fullSyncButton = (buttonPanel.components[1] as JButton)
+            syncButton.isEnabled = true
+            fullSyncButton.isEnabled = true
+            syncButton.text = "选择性同步"
+            fullSyncButton.text = "全量同步"
+        }
     }
 }
 
