@@ -23,24 +23,33 @@ data class Repository(
     
     @Tag("filePatterns")
     @XCollection(style = XCollection.Style.v2)
-    var filePatterns: List<String> = listOf("**/*.proto"),
+    var filePatterns: List<String> = listOf("*"),
     
     @Tag("excludePatterns")
     @XCollection(style = XCollection.Style.v2)
-    var excludePatterns: List<String> = listOf("**/backend/**"),
+    var excludePatterns: List<String> = listOf(),
     
     @Tag("autoSync")
     var autoSync: AutoSyncConfig? = null,
     
     @Tag("backupConfig")
-    var backupConfig: BackupConfig? = null,
+    var backupConfig: BackupConfig? = BackupConfig(enabled = true),
     
     @Tag("internalSync")
     var internalSync: InternalSyncConfig? = null,
     
     @Tag("postSyncCommands")
     @XCollection(style = XCollection.Style.v2)
-    var postSyncCommands: List<PostSyncCommand> = listOf()
+    var postSyncCommands: MutableList<PostSyncCommand> = mutableListOf(),
+    
+    @Tag("repoType")
+    var repoType: String = "SSH",
+    
+    @Tag("username")
+    var username: String? = null,
+    
+    @Tag("password")
+    var password: String? = null
 )
 
 @Tag("AutoSyncConfig")

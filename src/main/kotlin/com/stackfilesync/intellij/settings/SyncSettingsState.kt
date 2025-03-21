@@ -20,6 +20,10 @@ class SyncSettingsState : PersistentStateComponent<SyncSettingsState> {
     @Tag("backupEnabled")
     var backupEnabledFlag: Boolean = true
 
+    // 添加方法以支持保存和加载最近的文件选择
+    private val recentFileSelections = mutableListOf<String>()
+    private val MAX_RECENT_SELECTIONS = 10
+
     override fun getState(): SyncSettingsState = this
 
     override fun loadState(state: SyncSettingsState) {
@@ -41,6 +45,23 @@ class SyncSettingsState : PersistentStateComponent<SyncSettingsState> {
 
     fun setBackupEnabled(enabled: Boolean) {
         backupEnabledFlag = enabled
+    }
+
+    fun getRecentFileSelections(): List<String> {
+        return recentFileSelections.toList()
+    }
+
+    fun addRecentFileSelection(pattern: String) {
+        // 如果模式已存在，先移除
+        recentFileSelections.remove(pattern)
+        
+        // 添加到列表头部
+        recentFileSelections.add(0, pattern)
+        
+        // 限制列表大小
+        while (recentFileSelections.size > MAX_RECENT_SELECTIONS) {
+            recentFileSelections.removeAt(recentFileSelections.size - 1)
+        }
     }
 
     companion object {

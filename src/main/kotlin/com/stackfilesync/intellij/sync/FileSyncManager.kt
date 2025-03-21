@@ -35,6 +35,22 @@ import javax.swing.JCheckBox
 import javax.swing.JLabel
 import javax.swing.JPanel
 import java.awt.BorderLayout
+import javax.swing.JButton
+import com.stackfilesync.intellij.service.SyncStateService
+import java.util.stream.Collectors
+import kotlin.io.path.name
+import javax.swing.JTextField
+import javax.swing.event.DocumentEvent
+import javax.swing.event.DocumentListener
+import javax.swing.JComboBox as ComboBox
+import javax.swing.BorderFactory
+import java.awt.event.KeyAdapter
+import java.awt.event.KeyEvent
+import java.awt.event.ItemEvent
+import java.awt.event.ItemListener
+import com.stackfilesync.intellij.settings.SyncSettingsState
+import javax.swing.DefaultComboBoxModel
+import java.awt.GridLayout
 
 class FileSyncManager(
     private val project: Project,
@@ -56,6 +72,11 @@ class FileSyncManager(
         val startTime = System.currentTimeMillis()
         var success = false
         var error: String? = null
+        
+        // 设置同步状态为开始
+        invokeLater {
+            SyncStateService.getInstance(project).setSyncStarted()
+        }
         
         try {
             validateConfig(repository)
@@ -132,6 +153,7 @@ class FileSyncManager(
         } finally {
             // 清理临时目录
             tempDir.toFile().deleteRecursively()
+            
             // 记录同步历史
             SyncHistoryService.getInstance().addHistoryItem(
                 SyncHistoryService.HistoryItem(
@@ -145,6 +167,11 @@ class FileSyncManager(
                     syncType = if (repository.autoSync?.enabled == true) "auto" else "manual"
                 )
             )
+            
+            // 重置同步按钮状态 - 使用已有的服务
+            invokeLater {
+                SyncStateService.getInstance(project).setSyncFinished()
+            }
         }
     }
 
@@ -221,41 +248,134 @@ class FileSyncManager(
             
             val handler = GitLineHandler(
                 project,
-                gitDir.parent.toFile(), // 使用父目录作为工作目录
+                gitDir.parent.toFile(),
                 GitCommand.CLONE
             )
             
             // 克隆参数
             handler.addParameters(
-                "--quiet",  // 减少输出
-                "--single-branch",  // 只克隆单个分支
-                "--branch", repository.branch,  // 指定分支
-                "--depth=1",  // 浅克隆
-                repository.url,
-                gitDir.toString()
+                "--quiet",
+                "--single-branch",
+                "--branch", repository.branch,
+                "--depth=1"
             )
             
-            // 命令日志
-            logService.appendLog("执行命令: git clone --quiet --single-branch --branch ${repository.branch} --depth=1 ${repository.url} ${gitDir}")
-            
-            val result = git.runCommand(handler)
-            
-            if (result.exitCode != 0) {
-                val errorMessage = """
-                    同步失败: 克隆仓库失败
-                    仓库: ${repository.url}
-                    分支: ${repository.branch}
-                    错误信息: ${result.errorOutput}
-                    
-                    请检查:
-                    1. 仓库地址是否正确
-                    2. 分支名称是否正确
-                    3. 是否有权限访问该仓库和分支
-                    4. 网络连接是否正常
-                """.trimIndent()
+            // 如果是 HTTPS 类型且提供了凭证
+            var askPassScript: File? = null
+            if (repository.repoType == "HTTPS" && !repository.username.isNullOrBlank() && !repository.password.isNullOrBlank()) {
+                // 创建临时脚本
+                askPassScript = createTemporaryAskPassScript(repository.username!!, repository.password!!)
                 
-                logService.appendLog("❌ $errorMessage")
-                throw SyncException.GitException(errorMessage)
+                // 在 IntelliJ 的 Git4Idea API 中可能没有直接设置环境变量的方法
+                // 另一种方式是修改 URL 来包含凭证 (不太安全但可行)
+                val urlWithCredentials = repository.url.replace(
+                    "https://", 
+                    "https://${repository.username}:${repository.password}@"
+                )
+                handler.addParameters(urlWithCredentials, gitDir.toString())
+                
+                logService.appendLog("使用 HTTPS 凭证认证")
+            } else {
+                // 使用原始 URL
+                handler.addParameters(repository.url, gitDir.toString())
+            }
+            
+            // 命令日志 - 隐藏密码
+            val safeUrl = if (repository.repoType == "HTTPS" && !repository.username.isNullOrBlank()) {
+                repository.url.replace("://", "://${repository.username}:****@")
+            } else {
+                repository.url
+            }
+            logService.appendLog("执行命令: git clone --quiet --single-branch --branch ${repository.branch} --depth=1 $safeUrl ${gitDir}")
+            
+            // 如果有 askPassScript，尝试通过 ProcessBuilder 执行
+            if (askPassScript != null) {
+                // 使用 ProcessBuilder 执行带环境变量的命令
+                val pb = ProcessBuilder(
+                    "git", "clone", "--quiet", "--single-branch", 
+                    "--branch", repository.branch, "--depth=1",
+                    repository.url, gitDir.toString()
+                )
+                pb.directory(gitDir.parent.toFile())
+                pb.environment()["GIT_ASKPASS"] = askPassScript.absolutePath
+                
+                val process = pb.start()
+                val processExitCode = process.waitFor()
+                
+                // 如果进程返回非零，则读取错误并抛出异常
+                if (processExitCode != 0) {
+                    val processErrorOutput = process.errorStream.bufferedReader().readText()
+                    val errorMessage = """
+                        同步失败: 克隆仓库失败
+                        仓库: ${repository.url}
+                        分支: ${repository.branch}
+                        错误信息: $processErrorOutput
+                        
+                        请检查:
+                        1. 仓库地址是否正确
+                        2. 分支名称是否正确
+                        3. 是否有权限访问该仓库和分支
+                        4. 网络连接是否正常
+                    """.trimIndent()
+                    
+                    logService.appendLog("❌ $errorMessage")
+                    throw SyncException.GitException(errorMessage)
+                }
+            } else {
+                // 使用标准的 git.runCommand
+                val gitResult = git.runCommand(handler)
+                
+                // 检查 git 结果
+                if (gitResult.exitCode != 0) {
+                    val errorMessage = """
+                        同步失败: 克隆仓库失败
+                        仓库: ${repository.url}
+                        分支: ${repository.branch}
+                        错误信息: ${gitResult.errorOutput}
+                        
+                        请检查:
+                        1. 仓库地址是否正确
+                        2. 分支名称是否正确
+                        3. 是否有权限访问该仓库和分支
+                        4. 网络连接是否正常
+                    """.trimIndent()
+                    
+                    logService.appendLog("❌ $errorMessage")
+                    throw SyncException.GitException(errorMessage)
+                }
+            }
+            
+            // 在克隆成功后添加额外日志
+            if (Files.exists(gitDir)) {
+                logService.appendLog("仓库克隆成功，检查目录结构：")
+                
+                // 列出根目录内容
+                Files.list(gitDir).use { stream ->
+                    stream.forEach { path ->
+                        val relativePath = gitDir.relativize(path)
+                        val fileType = if (Files.isDirectory(path)) "目录" else "文件"
+                        logService.appendLog("- $fileType: $relativePath")
+                    }
+                }
+                
+                // 检查源目录
+                val sourceDir = gitDir.resolve(repository.sourceDirectory)
+                if (Files.exists(sourceDir)) {
+                    logService.appendLog("远程目录 '${repository.sourceDirectory}' 存在")
+                    
+                    // 如果源目录是非根目录，列出其内容
+                    if (repository.sourceDirectory.isNotBlank()) {
+                        Files.list(sourceDir).use { stream ->
+                            stream.forEach { path ->
+                                val relativePath = sourceDir.relativize(path)
+                                val fileType = if (Files.isDirectory(path)) "目录" else "文件"
+                                logService.appendLog("  - $fileType: $relativePath")
+                            }
+                        }
+                    }
+                } else {
+                    logService.appendLog("警告：远程目录 '${repository.sourceDirectory}' 不存在")
+                }
             }
             
             // 验证当前分支
@@ -303,43 +423,71 @@ class FileSyncManager(
             // 添加日志输出
             indicator.text = "正在切换到分支: ${repository.branch}..."
             
-            val handler = GitLineHandler(
-                project,
-                gitDir.toFile(),
-                GitCommand.CHECKOUT
-            )
-            handler.addParameters(repository.branch)
-            
-            // 执行Git命令
-            val result = git.runCommand(handler)
-            
-            // 检查命令执行结果
-            if (result.exitCode != 0) {
-                // 获取详细错误信息
-                val errorOutput = result.errorOutput
-                val errorMessage = """
-                    Git操作失败: 切换分支失败: ${repository.branch}
-                    错误信息: ${errorOutput}
+            // 如果是 HTTPS 类型且提供了凭证，使用 ProcessBuilder
+            if (repository.repoType == "HTTPS" && !repository.username.isNullOrBlank() && !repository.password.isNullOrBlank()) {
+                val askPassScript = createTemporaryAskPassScript(repository.username!!, repository.password!!)
+                tempCredentialFiles.add(askPassScript)
+                
+                // 使用 ProcessBuilder 来执行命令并设置环境变量
+                val pb = ProcessBuilder(
+                    "git", "checkout", repository.branch
+                )
+                pb.directory(gitDir.toFile())
+                pb.environment()["GIT_ASKPASS"] = askPassScript.absolutePath
+                pb.redirectErrorStream(true)
+                
+                val process = pb.start()
+                val exitCode = process.waitFor()
+                
+                if (exitCode != 0) {
+                    val output = process.inputStream.bufferedReader().readText()
+                    val errorMessage = """
+                        Git操作失败: 切换分支失败: ${repository.branch}
+                        错误信息: $output
+                        
+                        请检查:
+                        1. 分支名称是否正确
+                        2. 分支是否存在
+                        3. 是否有权限访问该分支
+                        4. 远程仓库连接是否正常
+                    """.trimIndent()
                     
-                    请检查:
-                    1. 分支名称是否正确
-                    2. 分支是否存在
-                    3. 是否有权限访问该分支
-                    4. 远程仓库连接是否正常
-                """.trimIndent()
-                
-                // 显示错误通知
-                invokeLater {
-                    NotificationUtils.showError(
-                        project,
-                        "切换分支失败",
-                        errorMessage
-                    )
+                    logService.appendLog("❌ $errorMessage")
+                    throw SyncException.GitException(errorMessage)
                 }
+            } else {
+                // 使用 GitLineHandler
+                val handler = GitLineHandler(
+                    project,
+                    gitDir.toFile(),
+                    GitCommand.CHECKOUT
+                )
+                handler.addParameters(repository.branch)
                 
-                throw SyncException.GitException(errorMessage)
+                // 执行Git命令
+                val result = git.runCommand(handler)
+                
+                // 检查命令执行结果
+                if (result.exitCode != 0) {
+                    // 获取详细错误信息
+                    val errorOutput = result.errorOutput
+                    val errorMessage = """
+                        Git操作失败: 切换分支失败: ${repository.branch}
+                        错误信息: ${errorOutput}
+                        
+                        请检查:
+                        1. 分支名称是否正确
+                        2. 分支是否存在
+                        3. 是否有权限访问该分支
+                        4. 远程仓库连接是否正常
+                    """.trimIndent()
+                    
+                    logService.appendLog("❌ $errorMessage")
+                    throw SyncException.GitException(errorMessage)
+                }
             }
             
+            logService.appendLog("✅ 成功切换到分支: ${repository.branch}")
         } catch (e: Exception) {
             val errorMessage = """
                 Git操作失败: 切换分支失败: ${repository.branch}
@@ -352,15 +500,7 @@ class FileSyncManager(
                 4. 远程仓库连接是否正常
             """.trimIndent()
             
-            // 显示错误通知
-            invokeLater {
-                NotificationUtils.showError(
-                    project,
-                    "切换分支失败",
-                    errorMessage
-                )
-            }
-            
+            logService.appendLog("❌ $errorMessage")
             throw SyncException.GitException(errorMessage, e)
         }
     }
@@ -464,14 +604,28 @@ class FileSyncManager(
                     isSelected = true
                 }
                 
+                // 添加搜索框
+                private val searchField = JTextField().apply {
+                    preferredSize = Dimension(300, 30)
+                }
+                
+                // 添加搜索按钮
+                private val searchButton = JButton("过滤").apply {
+                    addActionListener {
+                        filterItems(searchField.text.trim())
+                    }
+                }
+                
+                // 文件路径列表（用于过滤）
+                private val allFilePaths = availableFiles.map { sourceDir.relativize(it).toString() }
+                
                 init {
                     title = "选择要同步的文件"
                     init()
                     
                     // 添加文件列表
-                    availableFiles.forEach { file ->
-                        val relativePath = sourceDir.relativize(file).toString()
-                        checkBoxList.addItem(relativePath, relativePath, true)  // 默认全选
+                    allFilePaths.forEach { path ->
+                        checkBoxList.addItem(path, path, true)  // 默认全选
                     }
 
                     // 设置全选复选框的动作
@@ -488,38 +642,111 @@ class FileSyncManager(
 
                     // 设置复选框列表的点击处理
                     checkBoxList.setCheckBoxListListener { index, value ->
-                        val item = checkBoxList.getItemAt(index)
-                        if (item is String) {
-                            // 更新全选状态
-                            var allSelected = true
-                            for (i in 0 until checkBoxList.itemsCount) {
-                                val currentItem = checkBoxList.getItemAt(i)
-                                if (currentItem is String && !checkBoxList.isItemSelected(currentItem)) {
-                                    allSelected = false
-                                    break
-                                }
+                        // 更新全选状态
+                        updateSelectAllState()
+                    }
+                    
+                    // 添加回车键监听器到搜索框
+                    searchField.addKeyListener(object : KeyAdapter() {
+                        override fun keyPressed(e: KeyEvent) {
+                            if (e.keyCode == KeyEvent.VK_ENTER) {
+                                filterItems(searchField.text.trim())
                             }
-                            selectAllCheckBox.isSelected = allSelected
-                            checkBoxList.repaint()
+                        }
+                    })
+                }
+                
+                // 添加过滤功能
+                private fun filterItems(filterText: String) {
+                    // 如果过滤文本为空，恢复所有项
+                    if (filterText.isEmpty()) {
+                        checkBoxList.clear()
+                        allFilePaths.forEach { path ->
+                            checkBoxList.addItem(path, path, selectAllCheckBox.isSelected)
+                        }
+                        return
+                    }
+                    
+                    // 使用过滤文本过滤路径
+                    val filteredPaths = allFilePaths.filter { path ->
+                        path.toLowerCase().contains(filterText.toLowerCase()) ||
+                                matchGlobPattern(path, filterText)
+                    }
+                    
+                    // 更新列表
+                    checkBoxList.clear()
+                    filteredPaths.forEach { path ->
+                        checkBoxList.addItem(path, path, selectAllCheckBox.isSelected)
+                    }
+                    
+                    // 如果过滤后有文件，保存过滤条件
+                    if (filteredPaths.isNotEmpty() && filterText.isNotEmpty()) {
+                        try {
+                            // 尝试保存到最近选择
+                            SyncSettingsState.getInstance().addRecentFileSelection(filterText)
+                        } catch (e: Exception) {
+                            // 忽略可能的异常
                         }
                     }
                 }
                 
+                // 简单的通配符匹配
+                private fun matchGlobPattern(path: String, pattern: String): Boolean {
+                    if (!pattern.contains("*")) return false
+                    
+                    val regex = pattern
+                        .replace(".", "\\.")
+                        .replace("*", ".*")
+                        .let { ".*$it.*" }
+                        .toRegex(RegexOption.IGNORE_CASE)
+                    
+                    return regex.matches(path)
+                }
+                
+                private fun updateSelectAllState() {
+                    var allSelected = true
+                    for (i in 0 until checkBoxList.itemsCount) {
+                        val item = checkBoxList.getItemAt(i)
+                        if (item is String && !checkBoxList.isItemSelected(item)) {
+                            allSelected = false
+                            break
+                        }
+                    }
+                    selectAllCheckBox.isSelected = allSelected
+                }
+                
                 override fun createCenterPanel(): JComponent {
                     val panel = JPanel(BorderLayout())
-                    val scrollPane = JBScrollPane(checkBoxList)
-                    scrollPane.preferredSize = Dimension(500, 400)
                     
-                    // 添加全选复选框和文件计数
-                    val topPanel = JPanel(BorderLayout()).apply {
+                    // 创建搜索面板
+                    val searchPanel = JPanel(BorderLayout()).apply {
+                        border = BorderFactory.createEmptyBorder(0, 0, 10, 0)
+                        add(JLabel("搜索/过滤:"), BorderLayout.WEST)
+                        add(searchField, BorderLayout.CENTER)
+                        add(searchButton, BorderLayout.EAST)
+                    }
+                    
+                    // 创建文件数量面板
+                    val countPanel = JPanel(BorderLayout()).apply {
                         add(selectAllCheckBox, BorderLayout.WEST)
                         add(JLabel("共 ${availableFiles.size} 个文件"), BorderLayout.EAST)
                     }
                     
+                    // 创建顶部面板（使用BorderLayout而不是GridLayout）
+                    val topPanel = JPanel(BorderLayout())
+                    topPanel.add(countPanel, BorderLayout.NORTH)
+                    topPanel.add(searchPanel, BorderLayout.SOUTH)
+                    
+                    val scrollPane = JBScrollPane(checkBoxList)
+                    scrollPane.preferredSize = Dimension(500, 400)
+                    
                     panel.add(topPanel, BorderLayout.NORTH)
                     panel.add(scrollPane, BorderLayout.CENTER)
+                    
                     return panel
                 }
+                
+                override fun getPreferredFocusedComponent() = searchField
                 
                 fun getSelectedFiles(): List<Path> {
                     val selectedPaths = mutableListOf<String>()
@@ -529,6 +756,7 @@ class FileSyncManager(
                             selectedPaths.add(item)
                         }
                     }
+                    
                     return selectedPaths.mapNotNull { relativePath ->
                         availableFiles.find { sourceDir.relativize(it).toString() == relativePath }
                     }
@@ -560,11 +788,35 @@ class FileSyncManager(
     }
 
     private fun findFilesToSync(sourceDir: Path, repository: Repository): List<Path> {
-        return FilePatternMatcher.findMatchingFiles(
+        logService.appendLog("源目录路径: ${sourceDir}")
+        logService.appendLog("文件匹配模式: ${repository.filePatterns.joinToString(", ")}")
+        logService.appendLog("排除模式: ${repository.excludePatterns.joinToString(", ")}")
+        
+        // 检查源目录是否存在
+        if (!Files.exists(sourceDir)) {
+            logService.appendLog("警告：指定的源目录 '${sourceDir}' 不存在")
+            return emptyList()
+        }
+        
+        // 列出源目录中的文件和子目录
+        try {
+            val dirContents = mutableListOf<Path>()
+            Files.list(sourceDir).use { stream ->
+                stream.forEach { dirContents.add(it) }
+            }
+            logService.appendLog("源目录包含 ${dirContents.size} 个文件/目录：${dirContents.map { it.fileName.toString() }.joinToString(", ")}")
+        } catch (e: Exception) {
+            logService.appendLog("列出源目录内容时出错: ${e.message}")
+        }
+        
+        val matchingFiles = FilePatternMatcher.findMatchingFiles(
             sourceDir,
             repository.filePatterns,
             repository.excludePatterns
         )
+        
+        logService.appendLog("匹配到 ${matchingFiles.size} 个文件")
+        return matchingFiles
     }
 
     private fun executePostSyncCommands(repository: Repository) {
@@ -686,5 +938,38 @@ class FileSyncManager(
                 NotificationUtils.showInfo(project, title, message)
             }
         }
+    }
+
+    // 添加以下辅助方法
+    private fun createTemporaryAskPassScript(username: String, password: String): File {
+        val script = File.createTempFile("git_askpass", ".sh")
+        script.setExecutable(true)
+        
+        // 写入脚本内容
+        script.writeText("""
+            #!/bin/sh
+            if echo "$1" | grep -qi "username"; then
+                echo "$username"
+            else
+                echo "$password"
+            fi
+        """.trimIndent())
+        
+        return script
+    }
+
+    private val tempCredentialFiles = mutableListOf<File>()
+
+    private fun cleanupTemporaryCredentialFiles() {
+        tempCredentialFiles.forEach { file ->
+            try {
+                if (file.exists()) {
+                    file.delete()
+                }
+            } catch (e: Exception) {
+                // 忽略删除失败的错误
+            }
+        }
+        tempCredentialFiles.clear()
     }
 } 

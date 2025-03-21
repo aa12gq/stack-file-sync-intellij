@@ -32,15 +32,45 @@ import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.Insets
 import com.intellij.icons.AllIcons
+import com.intellij.ui.dsl.builder.bindSelected
+import com.intellij.ui.dsl.builder.selected
+import com.intellij.openapi.ui.ComboBox
+import javax.swing.DefaultComboBoxModel
+import java.awt.FlowLayout
 
 class RepositorySettingsPanel(private val project: Project) {
     private var panel: DialogPanel? = null
     private var repository = Repository()
     private lateinit var commandList: JBList<PostSyncCommand>
     private lateinit var listModel: DefaultListModel<PostSyncCommand>
+    
+    // 将UI元素声明为类的成员变量，这样在类中的任何地方都可以访问
+    private lateinit var usernamePanel: JPanel
+    private lateinit var passwordPanel: JPanel
+    private lateinit var usernameField: JTextField
+    private lateinit var passwordField: JPasswordField
+    private lateinit var sshRadio: JRadioButton
+    private lateinit var httpsRadio: JRadioButton
 
     fun createPanel(): JPanel {
         if (panel == null) {
+            // 初始化面板之前先创建UI组件
+            // 创建用户名面板
+            usernamePanel = JPanel(BorderLayout())
+            usernameField = JTextField(repository.username ?: "")
+            usernamePanel.add(usernameField, BorderLayout.CENTER)
+            usernamePanel.isVisible = repository.repoType == "HTTPS"
+
+            // 创建密码面板
+            passwordPanel = JPanel(BorderLayout())
+            passwordField = JPasswordField(repository.password ?: "")
+            passwordPanel.add(passwordField, BorderLayout.CENTER)
+            passwordPanel.isVisible = repository.repoType == "HTTPS"
+
+            // 创建单选按钮
+            sshRadio = JRadioButton("SSH", repository.repoType == "SSH")
+            httpsRadio = JRadioButton("HTTPS", repository.repoType == "HTTPS")
+            
             panel = panel {
                 group("基本设置") {
                     row("仓库名称:") {
@@ -50,6 +80,44 @@ class RepositorySettingsPanel(private val project: Project) {
                             .validationOnInput {
                                 if (it.text.isBlank()) error("仓库名称不能为空") else null
                             }
+                    }
+                    
+                    row("仓库类型:") {
+                        // 使用传统的 Swing UI 组件
+                        val repoTypePanel = JPanel(FlowLayout(FlowLayout.LEFT))
+                        val buttonGroup = ButtonGroup()
+                        buttonGroup.add(sshRadio)
+                        buttonGroup.add(httpsRadio)
+
+                        // 添加事件监听器
+                        sshRadio.addActionListener {
+                            if (sshRadio.isSelected) {
+                                repository.repoType = "SSH"
+                                usernamePanel.isVisible = false
+                                passwordPanel.isVisible = false
+                            }
+                        }
+
+                        httpsRadio.addActionListener {
+                            if (httpsRadio.isSelected) {
+                                repository.repoType = "HTTPS"
+                                usernamePanel.isVisible = true
+                                passwordPanel.isVisible = true
+                            }
+                        }
+
+                        repoTypePanel.add(sshRadio)
+                        repoTypePanel.add(httpsRadio)
+
+                        cell(repoTypePanel)
+                    }
+                    
+                    row("用户名:") {
+                        cell(usernamePanel)
+                    }
+                    
+                    row("密码:") {
+                        cell(passwordPanel)
                     }
                     
                     row("Git仓库URL:") {
@@ -559,16 +627,44 @@ class RepositorySettingsPanel(private val project: Project) {
 
     fun getRepository(): Repository {
         panel?.apply()  // 确保所有更改都被应用到 repository 对象
+        
+        // 手动获取用户名和密码，因为它们使用原生 Swing 组件
+        if (repository.repoType == "HTTPS") {
+            repository.username = usernameField.text.takeIf { it.isNotEmpty() }
+            repository.password = String(passwordField.password).takeIf { it.isNotEmpty() }
+        } else {
+            repository.username = null
+            repository.password = null
+        }
+        
         return repository
     }
 
     fun setRepository(repo: Repository) {
         repository = repo.copy()
+        
+        // 如果面板已经创建，更新UI组件状态
+        if (::usernameField.isInitialized) {
+            usernameField.text = repository.username ?: ""
+            usernamePanel.isVisible = repository.repoType == "HTTPS"
+        }
+        
+        if (::passwordField.isInitialized) {
+            passwordField.text = repository.password ?: ""
+            passwordPanel.isVisible = repository.repoType == "HTTPS"
+        }
+        
+        if (::sshRadio.isInitialized) {
+            sshRadio.isSelected = repository.repoType == "SSH"
+            httpsRadio.isSelected = repository.repoType == "HTTPS"
+        }
+        
         if (panel == null) {
             createPanel()
+        } else {
+            updateCommandList()  // 更新命令列表
+            panel?.reset()  // 重置面板以显示新的数据
         }
-        updateCommandList()  // 更新命令列表
-        panel?.reset()  // 重置面板以显示新的数据
     }
 
     // 更新命令列表

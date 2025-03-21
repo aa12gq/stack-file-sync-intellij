@@ -16,6 +16,41 @@
   - Auto-sync status is preserved across IDE restarts
   - Visual indicators show auto-sync status in repository list
 
+## [1.2.0] - 2024-03-21
+
+### Added
+
+- Support for SSH and HTTPS repository types
+  - HTTPS mode with username and password authentication, eliminating repeated credential entry
+  - Automatic saving and usage of HTTPS credentials for repository cloning and synchronization
+- Enhanced file selection dialog
+  - Search/filter functionality with text matching and wildcards
+  - Save recently used filter patterns
+  - One-click select/deselect all functionality
+  - Display of total and selected file counts
+- Improved internal sync state management
+  - Disable sync buttons during synchronization to prevent duplicate operations
+  - Automatic button state restoration after sync completion
+  - More detailed error information when synchronization fails
+- Repository file scanning optimizations
+  - Automatic recursive scanning of files in subdirectories
+  - Improved file matching algorithm supporting more complex patterns
+  - Detailed synchronization logs including file search paths and results
+
+### Improvements
+
+- Enhanced error handling and user notifications
+- Optimized Git authentication process, supporting environment variables and credential embedding
+- More detailed synchronization logs clearly showing repository structure and file scanning results
+- UI interaction flow optimization, reducing operational steps
+
+### Fixed
+
+- Fixed issues with sync button sometimes showing incorrect state
+- Fixed search functionality occasionally not working in file selection dialog
+- Fixed subdirectory files sometimes not being matched properly
+- Fixed several HTTPS authentication-related stability issues
+
 ## [1.1.0] - 2024-02-20
 
 ### Added

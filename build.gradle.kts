@@ -23,7 +23,7 @@ dependencies {
 }
 
 group = "com.stackfilesync"
-version = "1.1.0"
+version = "1.2.0"
 
 repositories {
     mavenCentral()
@@ -70,7 +70,7 @@ tasks {
         untilBuild.set("241.*")
         
         changeNotes.set("""
-            <h3>1.1.0</h3>
+            <h3>1.2.0</h3>
             <ul>
                 <li>Added P2P file transfer functionality</li>
                 <li>Added P2P node configuration</li>
