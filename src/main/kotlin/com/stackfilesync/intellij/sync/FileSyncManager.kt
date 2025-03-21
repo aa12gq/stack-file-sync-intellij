@@ -61,6 +61,8 @@ class FileSyncManager(
     private var syncedFiles = mutableListOf<String>()
     private val backupManager = BackupManager(project)
     private val logService = LogService.getInstance(project)
+    private var syncStartTime: Long = 0 // 添加同步开始时间
+    private val MAX_SYNC_BUTTON_LOCK_TIME = 30000 // 30秒的毫秒表示
 
     /**
      * 同步仓库文件
@@ -70,6 +72,7 @@ class FileSyncManager(
      */
     fun sync(repository: Repository, showFileSelection: Boolean = true, isAutoSync: Boolean = false) {
         val startTime = System.currentTimeMillis()
+        syncStartTime = startTime // 记录同步开始时间
         var success = false
         var error: String? = null
         
@@ -77,6 +80,18 @@ class FileSyncManager(
         invokeLater {
             SyncStateService.getInstance(project).setSyncStarted()
         }
+        
+        // 创建一个定时器，确保按钮不会被锁定太久
+        val timer = java.util.Timer()
+        timer.schedule(object : java.util.TimerTask() {
+            override fun run() {
+                // 如果同步已经运行超过30秒，重置按钮状态
+                invokeLater {
+                    SyncStateService.getInstance(project).setSyncFinished()
+                    logService.appendLog("\n注意: 同步按钮已重置，但同步过程仍在继续...")
+                }
+            }
+        }, MAX_SYNC_BUTTON_LOCK_TIME.toLong())
         
         try {
             validateConfig(repository)
@@ -168,9 +183,15 @@ class FileSyncManager(
                 )
             )
             
-            // 重置同步按钮状态 - 使用已有的服务
-            invokeLater {
-                SyncStateService.getInstance(project).setSyncFinished()
+            // 取消定时器，避免重复设置按钮状态
+            timer.cancel()
+            
+            // 只有当同步时间不超过MAX_SYNC_BUTTON_LOCK_TIME时才重置按钮状态
+            // 否则按钮状态已经被定时器重置
+            if (System.currentTimeMillis() - syncStartTime < MAX_SYNC_BUTTON_LOCK_TIME) {
+                invokeLater {
+                    SyncStateService.getInstance(project).setSyncFinished()
+                }
             }
         }
     }
