@@ -116,7 +116,7 @@
         <projectService 
             serviceImplementation="com.stackfilesync.intellij.logs.LogService"/>
         
-        <!-- 添加传输历史服务 -->
+        <!-- 传输历史服务 -->
         <projectService 
             serviceImplementation="com.stackfilesync.intellij.service.P2PTransferHistoryService"/>
         
@@ -127,6 +127,25 @@
         <!-- 节点配置服务 -->
         <projectService 
             serviceImplementation="com.stackfilesync.intellij.service.P2PNodeConfigService"/>
+        
+        <!-- 添加通知组 -->
+        <notificationGroup id="Stack File Sync Notifications" 
+                           displayType="BALLOON" 
+                           key="stack.file.sync.notifications"/>
+        
+        <!-- 工具窗口 -->
+        <toolWindow id="用户发现" 
+                    secondary="true" 
+                    icon="/icons/user_discovery.svg" 
+                    anchor="right" 
+                    factoryClass="com.stackfilesync.ui.UserDiscoveryToolWindow"/>
+        
+        <!-- 添加用户发现启动活动 -->
+        <postStartupActivity implementation="com.stackfilesync.startup.UserDiscoveryStartup"/>
+        
+        <!-- 添加新服务 -->
+        <applicationService serviceImplementation="com.stackfilesync.service.NetworkDiscoveryService"/>
+        <applicationService serviceImplementation="com.stackfilesync.service.MessageReceiveService"/>
     </extensions>
 
     <actions>
@@ -155,27 +174,6 @@
                 text="Toggle Auto Sync"
                 description="Enable/Disable auto sync">
             <add-to-group group-id="StackFileSync.RepositoryActions" anchor="last"/>
-        </action>
-        
-        <!-- P2P Transfer Action -->
-        <action id="P2PTransfer" 
-                class="com.stackfilesync.intellij.actions.P2PTransferAction"
-                text="P2P Transfer"
-                description="Transfer files to other users">
-            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-            <add-to-group group-id="EditorTabPopupMenu" anchor="last"/>
-            <add-to-group group-id="ProjectViewPopupMenuModifyGroup" anchor="last"/>
-            <add-to-group group-id="ConsoleEditorPopupMenu" anchor="last"/>
-            <keyboard-shortcut keymap="$default" first-keystroke="control alt P"/>
-        </action>
-        
-        <!-- P2P Config Action -->
-        <action id="StackFileSync.P2PConfig" 
-                class="com.stackfilesync.intellij.actions.P2PConfigAction"
-                text="P2P Node Config"
-                description="Configure P2P nodes">
-            <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
     </actions>
 </idea-plugin>
