@@ -69,10 +69,10 @@
     <depends optional="true" config-file="withImages.xml">com.intellij.platform.images</depends>
 
     <!-- 版本兼容性配置 -->
-    <idea-version since-build="223.0" until-build="241.*"/>  <!-- 支持 2022.3 到 2024.1 的版本 -->
+    <idea-version since-build="223.0"/>  <!-- 支持 2022.3 及以上所有版本 -->
     
     <!-- 如果需要支持更老的版本，可以设置更低的 since-build -->
-    <!-- <idea-version since-build="213.0" until-build="241.*"/> -->  <!-- 支持 2021.3 到 2024.1 的版本 -->
+    <!-- <idea-version since-build="213.0"/> -->  <!-- 支持 2021.3 及以上所有版本 -->
 
     <!-- Extension points defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->

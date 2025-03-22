@@ -23,7 +23,7 @@ dependencies {
 }
 
 group = "com.stackfilesync"
-version = "1.2.0"
+version = "1.2.1"
 
 repositories {
     mavenCentral()
@@ -46,6 +46,8 @@ intellij {
         "java",
         "platform-images"
     ))
+    updateSinceUntilBuild.set(true)
+    sameSinceUntilBuild.set(false)
 }
 
 tasks {
@@ -66,8 +68,8 @@ tasks {
 
     patchPluginXml {
         version.set(project.version.toString())
-        sinceBuild.set("223")
-        untilBuild.set("241.*")
+        sinceBuild.set("223.0")
+        untilBuild.set("243.*")
         
         changeNotes.set("""
             <h3>1.2.0</h3>
