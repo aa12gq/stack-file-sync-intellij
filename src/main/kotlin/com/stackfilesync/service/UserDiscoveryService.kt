@@ -59,16 +59,26 @@ class UserDiscoveryService(private val project: Project) {
         // 添加从网络发现的用户
         connectedUsers.addAll(networkUsers.values)
         
-        // 如果没有网络用户，添加一些示例用户
-        if (networkUsers.isEmpty()) {
-            // 添加一些示例用户
-            val exampleUsers = listOf(
-                UserInfo("user1", "张三", "https://example.com"),
-                UserInfo("user2", "李四", "https://example.com"),
-                UserInfo("user3", "王五", "https://example.com"),
-                UserInfo("user4", "赵六", "https://example.com")
-            )
-            connectedUsers.addAll(exampleUsers.filter { it.id != currentUser?.id })
+        // 移除示例用户逻辑，只保留真实用户
+        // 如果在开发调试环境下确实需要一些测试用户，可以通过配置开关来控制
+        val properties = com.intellij.ide.util.PropertiesComponent.getInstance()
+        val enableTestUsers = properties.getBoolean("stack.file.sync.enableTestUsers", false)
+        
+        if (enableTestUsers && networkUsers.isEmpty() && connectedUsers.size <= 1) {
+            // 只在特定配置下才添加测试用户，默认关闭
+            val testUserCount = 2 // 限制测试用户数量
+            for (i in 1..testUserCount) {
+                // 使用明确的编号，避免重名
+                val testUserId = "test-${System.currentTimeMillis()}-$i"
+                val testUser = UserInfo(
+                    id = testUserId,
+                    username = "测试用户-$i", 
+                    serverUrl = "localhost"
+                )
+                if (testUser.id != currentUser?.id) {
+                    connectedUsers.add(testUser)
+                }
+            }
         }
         
         println("获取到 ${connectedUsers.size} 个用户")
@@ -104,8 +114,10 @@ class UserDiscoveryService(private val project: Project) {
         listeners.forEach { it.onNotificationReceived(fromUser, message) }
     }
     
-    fun addListener(listener: UserDiscoveryListener) {
-        listeners.add(listener)
+    fun addListener(listener: Any) {
+        if (listener is UserDiscoveryListener) {
+            listeners.add(listener)
+        }
     }
     
     fun removeListener(listener: UserDiscoveryListener) {
@@ -118,7 +130,9 @@ class UserDiscoveryService(private val project: Project) {
     }
     
     private fun generateUniqueId(): String {
-        return System.currentTimeMillis().toString() + "-" + (0..1000).random()
+        val timestamp = System.currentTimeMillis()
+        val random = (1000..9999).random()
+        return "$timestamp-$random"
     }
     
     // 获取当前用户信息
@@ -147,8 +161,6 @@ class UserDiscoveryService(private val project: Project) {
     
     // 向远程用户发送通知
     private fun sendRemoteNotification(toUser: UserInfo, message: String) {
-        // 使用HTTP或UDP发送消息到目标用户
-        // 这里使用简单的UDP实现
         try {
             val socket = DatagramSocket()
             val gson = Gson()
@@ -160,8 +172,10 @@ class UserDiscoveryService(private val project: Project) {
             ))
             
             val data = notificationData.toByteArray()
+            // 这里有问题！在本地开发环境中，所有用户都是localhost
+            // 但是端口可能不正确，或者消息接收服务没有正确监听
             val address = InetAddress.getByName(toUser.serverUrl)
-            val packet = DatagramPacket(data, data.size, address, 8889) // 使用不同端口接收消息
+            val packet = DatagramPacket(data, data.size, address, 8889)
             
             socket.send(packet)
             socket.close()
@@ -199,6 +213,12 @@ class UserDiscoveryService(private val project: Project) {
     
     private fun sendRemoteSyncNotification(toUser: UserInfo, moduleName: String) {
         try {
+            // 先检查网络连接
+            val connectivityService = NetworkConnectivityService.getInstance(project)
+            if (!connectivityService.checkConnection(toUser)) {
+                println("警告: 用户 ${toUser.username} 网络连接不稳定，可能无法接收通知")
+            }
+            
             val socket = DatagramSocket()
             val gson = Gson()
             val notificationData = gson.toJson(SyncNotification(
@@ -210,23 +230,158 @@ class UserDiscoveryService(private val project: Project) {
             
             val data = notificationData.toByteArray()
             val address = InetAddress.getByName(toUser.serverUrl)
-            val packet = DatagramPacket(data, data.size, address, 8890)
             
-            socket.send(packet)
+            // 尝试发送到几个不同的端口，增加成功率
+            var sent = false
+            for (port in listOf(8890, 8880, 9890, 7890)) {
+                try {
+                    val packet = DatagramPacket(data, data.size, address, port)
+                    socket.send(packet)
+                    println("同步通知已发送到 ${toUser.username} (${toUser.serverUrl}:$port)")
+                    sent = true
+                } catch (e: Exception) {
+                    println("发送到端口 $port 失败: ${e.message}")
+                }
+            }
+            
             socket.close()
             
-            println("同步通知已发送到 ${toUser.username} (${toUser.serverUrl})")
+            if (!sent) {
+                throw Exception("所有端口发送尝试均失败")
+            }
         } catch (e: Exception) {
             println("发送同步通知失败: ${e.message}")
             e.printStackTrace()
         }
     }
     
-    private fun notifySyncNotificationReceived(fromUser: UserInfo, moduleName: String) {
+    fun notifySyncNotificationReceived(fromUser: UserInfo, moduleName: String, isBroadcast: Boolean = false) {
         listeners.forEach { 
             if (it is SyncNotificationListener) {
-                it.onSyncNotificationReceived(fromUser, moduleName)
+                it.onSyncNotificationReceived(fromUser, moduleName, isBroadcast)
             }
+        }
+    }
+    
+    fun sendSyncResponse(toUser: UserInfo, moduleName: String, accepted: Boolean) {
+        try {
+            val socket = DatagramSocket()
+            val gson = Gson()
+            val action = if (accepted) "ACCEPTED" else "REJECTED"
+            
+            val notificationData = gson.toJson(SyncResponseNotification(
+                fromUserId = currentUser?.id ?: "",
+                fromUsername = currentUser?.username ?: "",
+                toUserId = toUser.id,
+                moduleName = moduleName,
+                action = action,
+                timestamp = System.currentTimeMillis()
+            ))
+            
+            val data = notificationData.toByteArray()
+            val address = InetAddress.getByName(toUser.serverUrl)
+            val packet = DatagramPacket(data, data.size, address, 8891) // 使用新端口
+            
+            socket.send(packet)
+            socket.close()
+            
+            println("同步回执已发送到 ${toUser.username} (${toUser.serverUrl}): $action")
+        } catch (e: Exception) {
+            println("发送同步回执失败: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+    
+    fun notifySyncResponseReceived(fromUser: UserInfo, moduleName: String, accepted: Boolean) {
+        listeners.forEach { 
+            if (it is SyncResponseListener) {
+                it.onSyncResponseReceived(fromUser, moduleName, accepted)
+            }
+        }
+    }
+    
+    // 添加广播同步通知方法
+    fun broadcastSyncNotification(moduleName: String) {
+        println("广播同步通知: 模块 $moduleName 需要同步")
+        
+        val notificationService = NotificationService.getInstance(project)
+        
+        // 获取除自己以外的所有连接用户
+        val otherUsers = connectedUsers.filter { it.id != currentUser?.id }
+        
+        if (otherUsers.isEmpty()) {
+            notificationService.showNotification(
+                "广播同步通知",
+                "没有其他用户可接收通知",
+                NotificationType.WARNING
+            )
+            return
+        }
+        
+        // 向所有用户发送同步通知
+        var successCount = 0
+        otherUsers.forEach { user ->
+            try {
+                sendRemoteSyncNotification(user, moduleName, isBroadcast = true)
+                successCount++
+            } catch (e: Exception) {
+                println("向用户 ${user.username} 发送广播失败: ${e.message}")
+            }
+        }
+        
+        // 显示发送结果
+        notificationService.showNotification(
+            "广播同步通知已发送",
+            "已向 $successCount/${otherUsers.size} 个用户广播模块 $moduleName 的同步通知",
+            NotificationType.INFORMATION
+        )
+    }
+    
+    // 修改发送方法，添加广播标记
+    private fun sendRemoteSyncNotification(toUser: UserInfo, moduleName: String, isBroadcast: Boolean = false) {
+        try {
+            // 先检查网络连接
+            val connectivityService = NetworkConnectivityService.getInstance(project)
+            if (!connectivityService.checkConnection(toUser)) {
+                println("警告: 用户 ${toUser.username} 网络连接不稳定，可能无法接收通知")
+            }
+            
+            val socket = DatagramSocket()
+            val gson = Gson()
+            val notificationData = gson.toJson(SyncNotification(
+                fromUserId = currentUser?.id ?: "",
+                fromUsername = currentUser?.username ?: "",
+                moduleName = moduleName,
+                timestamp = System.currentTimeMillis(),
+                isBroadcast = isBroadcast
+            ))
+            
+            val data = notificationData.toByteArray()
+            val address = InetAddress.getByName(toUser.serverUrl)
+            
+            // 尝试发送到几个不同的端口，增加成功率
+            var sent = false
+            for (port in listOf(8890, 8880, 9890, 7890)) {
+                try {
+                    val packet = DatagramPacket(data, data.size, address, port)
+                    socket.send(packet)
+                    val broadcastText = if (isBroadcast) "(广播)" else ""
+                    println("同步通知${broadcastText}已发送到 ${toUser.username} (${toUser.serverUrl}:$port)")
+                    sent = true
+                } catch (e: Exception) {
+                    println("发送到端口 $port 失败: ${e.message}")
+                }
+            }
+            
+            socket.close()
+            
+            if (!sent) {
+                throw Exception("所有端口发送尝试均失败")
+            }
+        } catch (e: Exception) {
+            println("发送同步通知失败: ${e.message}")
+            e.printStackTrace()
+            throw e // 重新抛出异常，让调用者知道发送失败
         }
     }
     
@@ -257,5 +412,15 @@ data class SyncNotification(
     val fromUserId: String,
     val fromUsername: String,
     val moduleName: String,
+    val timestamp: Long,
+    val isBroadcast: Boolean = false
+)
+
+data class SyncResponseNotification(
+    val fromUserId: String,
+    val fromUsername: String,
+    val toUserId: String,
+    val moduleName: String,
+    val action: String, // "ACCEPTED" 或 "REJECTED"
     val timestamp: Long
 ) 

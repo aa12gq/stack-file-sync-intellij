@@ -36,6 +36,23 @@
     <!-- Change notes for the plugin. -->
     <change-notes><![CDATA[
         <ul>
+            <li>1.3.1
+                <ul>
+                    <li>添加模块化同步通知系统</li>
+                    <li>实现智能模块过滤功能</li>
+                    <li>引入仓库选择交互流程</li>
+                    <li>优化用户间通信协议</li>
+                    <li>加强同步日志记录</li>
+                </ul>
+            </li>
+            <li>1.2.0
+                <ul>
+                    <li>支持 SSH 和 HTTPS 仓库类型</li>
+                    <li>增强文件选择对话框</li>
+                    <li>改进内部同步状态管理</li>
+                    <li>仓库文件扫描优化</li>
+                </ul>
+            </li>
             <li>1.0.1
                 <ul>
                     <li>Added import/export configuration feature</li>
@@ -128,7 +145,7 @@
         <projectService 
             serviceImplementation="com.stackfilesync.intellij.service.P2PNodeConfigService"/>
         
-        <!-- 添加通知组 -->
+        <!-- 通知组 -->
         <notificationGroup id="Stack File Sync Notifications" 
                            displayType="BALLOON" 
                            key="stack.file.sync.notifications"/>
@@ -140,10 +157,10 @@
                     anchor="right" 
                     factoryClass="com.stackfilesync.ui.UserDiscoveryToolWindow"/>
         
-        <!-- 添加用户发现启动活动 -->
+        <!-- 用户发现启动活动 -->
         <postStartupActivity implementation="com.stackfilesync.startup.UserDiscoveryStartup"/>
         
-        <!-- 添加新服务 -->
+        <!-- 新服务 -->
         <applicationService serviceImplementation="com.stackfilesync.service.NetworkDiscoveryService"/>
         <applicationService serviceImplementation="com.stackfilesync.service.MessageReceiveService"/>
     </extensions>
@@ -174,6 +191,14 @@
                 text="Toggle Auto Sync"
                 description="Enable/Disable auto sync">
             <add-to-group group-id="StackFileSync.RepositoryActions" anchor="last"/>
+        </action>
+        
+        <!-- 用户设置动作 -->
+        <action id="StackFileSync.UserSettings"
+                class="com.stackfilesync.actions.UserSettingsAction"
+                text="用户设置"
+                description="配置用户信息">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
     </actions>
 </idea-plugin>
