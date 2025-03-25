@@ -84,9 +84,43 @@ class UserDiscoveryPanel(private val project: Project) : JPanel(), UserDiscovery
         syncButton.addActionListener {
             val selectedUser = userList.selectedValue
             if (selectedUser != null) {
-                val moduleName = JOptionPane.showInputDialog(this, "输入要同步的模块名称:")
-                if (!moduleName.isNullOrBlank()) {
-                    userDiscoveryService.sendSyncNotification(selectedUser, moduleName)
+                // 创建带备注的输入对话框
+                val panel = JPanel(BorderLayout())
+                
+                // 模块名称输入
+                val modulePanel = JPanel(BorderLayout())
+                modulePanel.border = BorderFactory.createTitledBorder("模块名称")
+                val moduleField = JTextField(20)
+                modulePanel.add(moduleField, BorderLayout.CENTER)
+                
+                // 备注输入
+                val remarkPanel = JPanel(BorderLayout())
+                remarkPanel.border = BorderFactory.createTitledBorder("备注 (可选)")
+                val remarkField = JTextField(20)
+                remarkPanel.add(remarkField, BorderLayout.CENTER)
+                
+                // 组装面板
+                panel.add(modulePanel, BorderLayout.NORTH)
+                panel.add(remarkPanel, BorderLayout.CENTER)
+                
+                // 显示对话框
+                val result = JOptionPane.showConfirmDialog(
+                    this,
+                    panel,
+                    "发送同步通知给 ${selectedUser.username}",
+                    JOptionPane.OK_CANCEL_OPTION,
+                    JOptionPane.PLAIN_MESSAGE
+                )
+                
+                if (result == JOptionPane.OK_OPTION) {
+                    val moduleName = moduleField.text.trim()
+                    val remark = remarkField.text.trim()
+                    
+                    if (moduleName.isNotBlank()) {
+                        userDiscoveryService.sendSyncNotification(selectedUser, moduleName, remark)
+                    } else {
+                        notificationService.showNotification("错误", "模块名称不能为空", NotificationType.ERROR)
+                    }
                 }
             } else {
                 notificationService.showNotification("错误", "请先选择一个用户", NotificationType.ERROR)
@@ -96,9 +130,43 @@ class UserDiscoveryPanel(private val project: Project) : JPanel(), UserDiscovery
         
         val broadcastButton = JButton("广播同步通知")
         broadcastButton.addActionListener {
-            val moduleName = JOptionPane.showInputDialog(this, "输入要广播同步的模块名称:")
-            if (!moduleName.isNullOrBlank()) {
-                userDiscoveryService.broadcastSyncNotification(moduleName)
+            // 创建带备注的输入对话框
+            val panel = JPanel(BorderLayout())
+            
+            // 模块名称输入
+            val modulePanel = JPanel(BorderLayout())
+            modulePanel.border = BorderFactory.createTitledBorder("模块名称")
+            val moduleField = JTextField(20)
+            modulePanel.add(moduleField, BorderLayout.CENTER)
+            
+            // 备注输入
+            val remarkPanel = JPanel(BorderLayout())
+            remarkPanel.border = BorderFactory.createTitledBorder("备注 (可选)")
+            val remarkField = JTextField(20)
+            remarkPanel.add(remarkField, BorderLayout.CENTER)
+            
+            // 组装面板
+            panel.add(modulePanel, BorderLayout.NORTH)
+            panel.add(remarkPanel, BorderLayout.CENTER)
+            
+            // 显示对话框
+            val result = JOptionPane.showConfirmDialog(
+                this,
+                panel,
+                "广播同步通知",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE
+            )
+            
+            if (result == JOptionPane.OK_OPTION) {
+                val moduleName = moduleField.text.trim()
+                val remark = remarkField.text.trim()
+                
+                if (moduleName.isNotBlank()) {
+                    userDiscoveryService.broadcastSyncNotification(moduleName, remark)
+                } else {
+                    notificationService.showNotification("错误", "模块名称不能为空", NotificationType.ERROR)
+                }
             }
         }
         buttonPanel.add(broadcastButton)
@@ -155,12 +223,19 @@ class UserDiscoveryPanel(private val project: Project) : JPanel(), UserDiscovery
         }
     }
     
-    override fun onSyncNotificationReceived(fromUser: UserInfo, moduleName: String, isBroadcast: Boolean) {
+    override fun onSyncNotificationReceived(
+        fromUser: UserInfo, 
+        moduleName: String, 
+        isBroadcast: Boolean, 
+        remark: String
+    ) {
         SwingUtilities.invokeLater {
             val messagePrefix = if (isBroadcast) "【广播通知】" else ""
+            val remarkText = if (remark.isNotBlank()) "\n\n备注: $remark" else ""
+            
             val result = JOptionPane.showConfirmDialog(
                 this,
-                "$messagePrefix${fromUser.username} 请求同步模块: $moduleName\n是否立即同步？",
+                "$messagePrefix${fromUser.username} 请求同步模块: $moduleName$remarkText\n是否立即同步？",
                 if (isBroadcast) "广播同步请求" else "同步请求",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.QUESTION_MESSAGE

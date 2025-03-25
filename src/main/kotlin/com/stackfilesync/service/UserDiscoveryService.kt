@@ -193,25 +193,26 @@ class UserDiscoveryService(private val project: Project) {
         notifyNotificationReceived(fromUser, message)
     }
     
-    fun sendSyncNotification(toUser: UserInfo, moduleName: String) {
-        println("发送同步通知给 ${toUser.username}: 模块 $moduleName 需要同步")
+    fun sendSyncNotification(toUser: UserInfo, moduleName: String, remark: String = "") {
+        println("发送同步通知给 ${toUser.username}: 模块 $moduleName 需要同步${if (remark.isNotBlank()) "，备注: $remark" else ""}")
         
         val notificationService = NotificationService.getInstance(project)
         
         if (toUser.id == currentUser?.id) {
-            notifySyncNotificationReceived(currentUser!!, moduleName)
+            notifySyncNotificationReceived(currentUser!!, moduleName, false, remark)
         } else {
-            sendRemoteSyncNotification(toUser, moduleName)
+            sendRemoteSyncNotification(toUser, moduleName, false, remark)
         }
         
+        val remarkText = if (remark.isNotBlank()) "（备注: $remark）" else ""
         notificationService.showNotification(
             "同步通知已发送",
-            "已通知 ${toUser.username} 同步模块 $moduleName",
+            "已通知 ${toUser.username} 同步模块 $moduleName$remarkText",
             NotificationType.INFORMATION
         )
     }
     
-    private fun sendRemoteSyncNotification(toUser: UserInfo, moduleName: String) {
+    private fun sendRemoteSyncNotification(toUser: UserInfo, moduleName: String, isBroadcast: Boolean = false, remark: String = "") {
         try {
             // 先检查网络连接
             val connectivityService = NetworkConnectivityService.getInstance(project)
@@ -225,7 +226,9 @@ class UserDiscoveryService(private val project: Project) {
                 fromUserId = currentUser?.id ?: "",
                 fromUsername = currentUser?.username ?: "",
                 moduleName = moduleName,
-                timestamp = System.currentTimeMillis()
+                timestamp = System.currentTimeMillis(),
+                isBroadcast = isBroadcast,
+                remark = remark
             ))
             
             val data = notificationData.toByteArray()
@@ -237,7 +240,8 @@ class UserDiscoveryService(private val project: Project) {
                 try {
                     val packet = DatagramPacket(data, data.size, address, port)
                     socket.send(packet)
-                    println("同步通知已发送到 ${toUser.username} (${toUser.serverUrl}:$port)")
+                    val broadcastText = if (isBroadcast) "(广播)" else ""
+                    println("同步通知${broadcastText}已发送到 ${toUser.username} (${toUser.serverUrl}:$port)")
                     sent = true
                 } catch (e: Exception) {
                     println("发送到端口 $port 失败: ${e.message}")
@@ -252,13 +256,14 @@ class UserDiscoveryService(private val project: Project) {
         } catch (e: Exception) {
             println("发送同步通知失败: ${e.message}")
             e.printStackTrace()
+            throw e // 重新抛出异常，让调用者知道发送失败
         }
     }
     
-    fun notifySyncNotificationReceived(fromUser: UserInfo, moduleName: String, isBroadcast: Boolean = false) {
+    fun notifySyncNotificationReceived(fromUser: UserInfo, moduleName: String, isBroadcast: Boolean = false, remark: String = "") {
         listeners.forEach { 
             if (it is SyncNotificationListener) {
-                it.onSyncNotificationReceived(fromUser, moduleName, isBroadcast)
+                it.onSyncNotificationReceived(fromUser, moduleName, isBroadcast, remark)
             }
         }
     }
@@ -301,8 +306,8 @@ class UserDiscoveryService(private val project: Project) {
     }
     
     // 添加广播同步通知方法
-    fun broadcastSyncNotification(moduleName: String) {
-        println("广播同步通知: 模块 $moduleName 需要同步")
+    fun broadcastSyncNotification(moduleName: String, remark: String = "") {
+        println("广播同步通知: 模块 $moduleName 需要同步${if (remark.isNotBlank()) "，备注: $remark" else ""}")
         
         val notificationService = NotificationService.getInstance(project)
         
@@ -322,67 +327,20 @@ class UserDiscoveryService(private val project: Project) {
         var successCount = 0
         otherUsers.forEach { user ->
             try {
-                sendRemoteSyncNotification(user, moduleName, isBroadcast = true)
+                sendRemoteSyncNotification(user, moduleName, true, remark)
                 successCount++
             } catch (e: Exception) {
                 println("向用户 ${user.username} 发送广播失败: ${e.message}")
             }
         }
         
+        val remarkText = if (remark.isNotBlank()) "（备注: $remark）" else ""
         // 显示发送结果
         notificationService.showNotification(
             "广播同步通知已发送",
-            "已向 $successCount/${otherUsers.size} 个用户广播模块 $moduleName 的同步通知",
+            "已向 $successCount/${otherUsers.size} 个用户广播模块 $moduleName 的同步通知$remarkText",
             NotificationType.INFORMATION
         )
-    }
-    
-    // 修改发送方法，添加广播标记
-    private fun sendRemoteSyncNotification(toUser: UserInfo, moduleName: String, isBroadcast: Boolean = false) {
-        try {
-            // 先检查网络连接
-            val connectivityService = NetworkConnectivityService.getInstance(project)
-            if (!connectivityService.checkConnection(toUser)) {
-                println("警告: 用户 ${toUser.username} 网络连接不稳定，可能无法接收通知")
-            }
-            
-            val socket = DatagramSocket()
-            val gson = Gson()
-            val notificationData = gson.toJson(SyncNotification(
-                fromUserId = currentUser?.id ?: "",
-                fromUsername = currentUser?.username ?: "",
-                moduleName = moduleName,
-                timestamp = System.currentTimeMillis(),
-                isBroadcast = isBroadcast
-            ))
-            
-            val data = notificationData.toByteArray()
-            val address = InetAddress.getByName(toUser.serverUrl)
-            
-            // 尝试发送到几个不同的端口，增加成功率
-            var sent = false
-            for (port in listOf(8890, 8880, 9890, 7890)) {
-                try {
-                    val packet = DatagramPacket(data, data.size, address, port)
-                    socket.send(packet)
-                    val broadcastText = if (isBroadcast) "(广播)" else ""
-                    println("同步通知${broadcastText}已发送到 ${toUser.username} (${toUser.serverUrl}:$port)")
-                    sent = true
-                } catch (e: Exception) {
-                    println("发送到端口 $port 失败: ${e.message}")
-                }
-            }
-            
-            socket.close()
-            
-            if (!sent) {
-                throw Exception("所有端口发送尝试均失败")
-            }
-        } catch (e: Exception) {
-            println("发送同步通知失败: ${e.message}")
-            e.printStackTrace()
-            throw e // 重新抛出异常，让调用者知道发送失败
-        }
     }
     
     companion object {
@@ -413,7 +371,8 @@ data class SyncNotification(
     val fromUsername: String,
     val moduleName: String,
     val timestamp: Long,
-    val isBroadcast: Boolean = false
+    val isBroadcast: Boolean = false,
+    val remark: String = ""
 )
 
 data class SyncResponseNotification(

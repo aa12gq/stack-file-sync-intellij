@@ -127,11 +127,12 @@ class MessageReceiveService(private val project: Project) {
                         serverUrl = packet.address.hostAddress
                     )
                     
-                    // 处理同步通知，添加广播标志
+                    // 处理同步通知，添加广播标志和备注
                     userService.notifySyncNotificationReceived(
                         fromUser, 
                         notification.moduleName,
-                        notification.isBroadcast
+                        notification.isBroadcast,
+                        notification.remark
                     )
                     
                     // 自动将发送者添加到用户列表
