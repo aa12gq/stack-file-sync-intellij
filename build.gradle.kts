@@ -23,7 +23,7 @@ dependencies {
 }
 
 group = "com.stackfilesync"
-version = "1.2.1"
+version = "1.3.1"
 
 repositories {
     mavenCentral()
@@ -39,15 +39,12 @@ repositories {
 // Configure Gradle IntelliJ Plugin
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
 intellij {
-    version.set("2022.3")
+    version.set("2023.1")
     type.set("IC")
-    plugins.set(listOf(
-        "Git4Idea",
-        "java",
-        "platform-images"
-    ))
+    plugins.set(listOf("git4idea"))
     updateSinceUntilBuild.set(true)
-    sameSinceUntilBuild.set(false)
+    sinceBuild.set("231")
+    untilBuild.set("233.*")
 }
 
 tasks {
@@ -60,16 +57,16 @@ tasks {
     withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
         kotlinOptions {
             jvmTarget = "17"
-            languageVersion = "1.7"
-            apiVersion = "1.7"
+            languageVersion = "1.8"
+            apiVersion = "1.8"
             freeCompilerArgs = listOf("-Xjsr305=strict")
         }
     }
 
     patchPluginXml {
         version.set(project.version.toString())
-        sinceBuild.set("223.0")
-        untilBuild.set("243.*")
+        sinceBuild.set("231")
+        untilBuild.set("233.*")
         
         changeNotes.set("""
             <h3>1.2.0</h3>
@@ -125,4 +122,15 @@ tasks.jar {
     exclude("com/intellij/uiDesigner/lw/**")
     exclude("com/intellij/uiDesigner/compiler/**")
     exclude("com/intellij/uiDesigner/shared/**")
+}
+
+kotlin {
+    jvmToolchain(17)
+    
+    sourceSets.all {
+        languageSettings {
+            languageVersion = "1.8"
+            apiVersion = "1.8"
+        }
+    }
 }

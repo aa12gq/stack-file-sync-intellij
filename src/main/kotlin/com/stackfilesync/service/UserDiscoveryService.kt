@@ -179,6 +179,57 @@ class UserDiscoveryService(private val project: Project) {
         notifyNotificationReceived(fromUser, message)
     }
     
+    fun sendSyncNotification(toUser: UserInfo, moduleName: String) {
+        println("发送同步通知给 ${toUser.username}: 模块 $moduleName 需要同步")
+        
+        val notificationService = NotificationService.getInstance(project)
+        
+        if (toUser.id == currentUser?.id) {
+            notifySyncNotificationReceived(currentUser!!, moduleName)
+        } else {
+            sendRemoteSyncNotification(toUser, moduleName)
+        }
+        
+        notificationService.showNotification(
+            "同步通知已发送",
+            "已通知 ${toUser.username} 同步模块 $moduleName",
+            NotificationType.INFORMATION
+        )
+    }
+    
+    private fun sendRemoteSyncNotification(toUser: UserInfo, moduleName: String) {
+        try {
+            val socket = DatagramSocket()
+            val gson = Gson()
+            val notificationData = gson.toJson(SyncNotification(
+                fromUserId = currentUser?.id ?: "",
+                fromUsername = currentUser?.username ?: "",
+                moduleName = moduleName,
+                timestamp = System.currentTimeMillis()
+            ))
+            
+            val data = notificationData.toByteArray()
+            val address = InetAddress.getByName(toUser.serverUrl)
+            val packet = DatagramPacket(data, data.size, address, 8890)
+            
+            socket.send(packet)
+            socket.close()
+            
+            println("同步通知已发送到 ${toUser.username} (${toUser.serverUrl})")
+        } catch (e: Exception) {
+            println("发送同步通知失败: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+    
+    private fun notifySyncNotificationReceived(fromUser: UserInfo, moduleName: String) {
+        listeners.forEach { 
+            if (it is SyncNotificationListener) {
+                it.onSyncNotificationReceived(fromUser, moduleName)
+            }
+        }
+    }
+    
     companion object {
         fun getInstance(project: Project): UserDiscoveryService = project.service()
     }
@@ -199,5 +250,12 @@ data class RemoteNotification(
     val fromUserId: String,
     val fromUsername: String,
     val message: String,
+    val timestamp: Long
+)
+
+data class SyncNotification(
+    val fromUserId: String,
+    val fromUsername: String,
+    val moduleName: String,
     val timestamp: Long
 ) 

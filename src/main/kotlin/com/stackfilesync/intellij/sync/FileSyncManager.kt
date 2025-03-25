@@ -68,8 +68,14 @@ class FileSyncManager(
      * @param repository 要同步的仓库
      * @param showFileSelection 是否显示文件选择对话框
      * @param isAutoSync 是否是自动同步
+     * @param moduleFilter 模块过滤器
      */
-    fun sync(repository: Repository, showFileSelection: Boolean = true, isAutoSync: Boolean = false) {
+    fun sync(
+        repository: Repository, 
+        showFileSelection: Boolean = true, 
+        isAutoSync: Boolean = false,
+        moduleFilter: String? = null
+    ) {
         val startTime = System.currentTimeMillis()
         var success = false
         var error: String? = null
@@ -101,7 +107,7 @@ class FileSyncManager(
             // 同步文件
             // 自动同步时强制使用全量同步模式
             val actualShowFileSelection = if (isAutoSync) false else showFileSelection
-            val syncResult = syncFromGit(repository, actualShowFileSelection)
+            val syncResult = syncFromGit(repository, actualShowFileSelection, moduleFilter)
             // 如果同步被取消或没有选择文件，直接返回
             if (!syncResult) {
                 logService.appendLog("\n同步已取消")
@@ -191,7 +197,11 @@ class FileSyncManager(
         }
     }
 
-    private fun syncFromGit(repository: Repository, showFileSelection: Boolean = true): Boolean {
+    private fun syncFromGit(
+        repository: Repository, 
+        showFileSelection: Boolean = true,
+        moduleFilter: String? = null
+    ): Boolean {
         try {
             val gitDir = tempDir.resolve(repository.name)
             
@@ -200,7 +210,7 @@ class FileSyncManager(
             
             // 同步文件
             logService.appendLog("开始同步文件...")
-            val syncSuccess = syncFiles(repository, gitDir, showFileSelection)
+            val syncSuccess = syncFiles(repository, gitDir, showFileSelection, moduleFilter)
             
             if (syncSuccess) {
                 logService.appendLog("文件同步完成")
@@ -224,7 +234,7 @@ class FileSyncManager(
                 )
             }
             
-            throw e
+            return false
         }
     }
 
@@ -501,7 +511,12 @@ class FileSyncManager(
         }
     }
 
-    private fun syncFiles(repository: Repository, sourcePath: Path, showFileSelection: Boolean = true): Boolean {
+    private fun syncFiles(
+        repository: Repository, 
+        sourcePath: Path, 
+        showFileSelection: Boolean = true,
+        moduleFilter: String? = null
+    ): Boolean {
         try {
             val targetDir = getTargetDirectory(repository)
             val sourceDir = sourcePath.resolve(repository.sourceDirectory)
@@ -528,13 +543,30 @@ class FileSyncManager(
                 return false
             }
 
-            logService.appendLog("找到 ${allFiles.size} 个文件可以同步")
+            // 增加模块过滤逻辑
+            val filteredFiles = if (moduleFilter != null) {
+                logService.appendLog("应用模块过滤: $moduleFilter")
+                allFiles.filter { file ->
+                    val relativePath = sourceDir.relativize(file).toString()
+                    val matches = relativePath.contains(moduleFilter, ignoreCase = true)
+                    if (matches) {
+                        logService.appendLog("匹配文件: $relativePath")
+                    }
+                    matches
+                }.also {
+                    logService.appendLog("过滤后剩余 ${it.size} 个文件")
+                }
+            } else {
+                allFiles
+            }
+            
+            logService.appendLog("找到 ${filteredFiles.size} 个文件可以同步")
 
             // 根据同步模式决定是否显示文件选择对话框
             val files = if (showFileSelection) {
-                chooseFilesToSync(allFiles, sourceDir)
+                chooseFilesToSync(filteredFiles, sourceDir)
             } else {
-                allFiles
+                filteredFiles
             }
             
             if (files.isEmpty()) {

@@ -333,6 +333,81 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
             fullSyncButton.text = "全量同步"
         }
     }
+
+    fun startSyncWithModule(moduleName: String) {
+        val repository = findRepositoryByModule(moduleName)
+        if (repository != null) {
+            startSync(repository, true, moduleName)
+        } else {
+            invokeLater {
+                com.intellij.openapi.ui.Messages.showErrorDialog(
+                    "未找到模块 $moduleName 对应的仓库配置",
+                    "同步失败"
+                )
+            }
+        }
+    }
+    
+    private fun findRepositoryByModule(moduleName: String): Repository? {
+        val settings = SyncSettingsState.getInstance()
+        return settings.getRepositories().find { repo ->
+            repo.sourceDirectory.contains(moduleName, ignoreCase = true) ||
+            repo.name.contains(moduleName, ignoreCase = true)
+        }
+    }
+    
+    private fun startSync(
+        repository: Repository, 
+        showFileSelection: Boolean = true,
+        moduleFilter: String? = null
+    ) {
+        isSyncing = true
+        val syncButton = (buttonPanel.components.last() as JButton)
+        val fullSyncButton = (buttonPanel.components[1] as JButton)
+        syncButton.isEnabled = false
+        fullSyncButton.isEnabled = false
+        syncButton.text = "同步中..."
+        fullSyncButton.text = "同步中..."
+
+        ProgressManager.getInstance().run(object : Task.Backgroundable(
+            project,
+            "同步文件",
+            false
+        ) {
+            override fun run(indicator: ProgressIndicator) {
+                try {
+                    val syncManager = FileSyncManager(project, indicator)
+                    syncManager.sync(repository, showFileSelection, isAutoSync = false, moduleFilter = moduleFilter)
+                } finally {
+                    // 确保在任务完成后（无论成功还是失败）重置按钮状态
+                    invokeLater {
+                        isSyncing = false
+                        syncButton.isEnabled = true
+                        fullSyncButton.isEnabled = true
+                        syncButton.text = "选择性同步"
+                        fullSyncButton.text = "全量同步"
+                    }
+                }
+            }
+
+            // 覆盖onFinished方法确保任务结束后UI更新
+            override fun onFinished() {
+                super.onFinished()
+                invokeLater {
+                    isSyncing = false
+                    syncButton.isEnabled = true
+                    fullSyncButton.isEnabled = true
+                    syncButton.text = "选择性同步"
+                    fullSyncButton.text = "全量同步"
+                }
+            }
+        })
+    }
+
+    fun startSyncWithModuleAndRepo(moduleName: String, repository: com.stackfilesync.intellij.model.Repository) {
+        // 直接使用传入的仓库对象启动同步
+        startSync(repository, true, moduleName)
+    }
 }
 
 class RepositoryListCellRenderer : javax.swing.DefaultListCellRenderer() {
