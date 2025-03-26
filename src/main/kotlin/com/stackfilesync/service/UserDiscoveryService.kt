@@ -214,12 +214,6 @@ class UserDiscoveryService(private val project: Project) {
     
     private fun sendRemoteSyncNotification(toUser: UserInfo, moduleName: String, isBroadcast: Boolean = false, remark: String = "") {
         try {
-            // 先检查网络连接
-            val connectivityService = NetworkConnectivityService.getInstance(project)
-            if (!connectivityService.checkConnection(toUser)) {
-                println("警告: 用户 ${toUser.username} 网络连接不稳定，可能无法接收通知")
-            }
-            
             val socket = DatagramSocket()
             val gson = Gson()
             val notificationData = gson.toJson(SyncNotification(
@@ -234,29 +228,23 @@ class UserDiscoveryService(private val project: Project) {
             val data = notificationData.toByteArray()
             val address = InetAddress.getByName(toUser.serverUrl)
             
-            // 尝试发送到几个不同的端口，增加成功率
-            var sent = false
-            for (port in listOf(8890, 8880, 9890, 7890)) {
-                try {
-                    val packet = DatagramPacket(data, data.size, address, port)
-                    socket.send(packet)
-                    val broadcastText = if (isBroadcast) "(广播)" else ""
-                    println("同步通知${broadcastText}已发送到 ${toUser.username} (${toUser.serverUrl}:$port)")
-                    sent = true
-                } catch (e: Exception) {
-                    println("发送到端口 $port 失败: ${e.message}")
-                }
-            }
-            
-            socket.close()
-            
-            if (!sent) {
-                throw Exception("所有端口发送尝试均失败")
+            // 只使用一个固定的端口
+            val port = 8890
+            try {
+                val packet = DatagramPacket(data, data.size, address, port)
+                socket.send(packet)
+                val broadcastText = if (isBroadcast) "(广播)" else ""
+                println("同步通知${broadcastText}已发送到 ${toUser.username} (${toUser.serverUrl}:$port)")
+            } catch (e: Exception) {
+                println("发送到端口 $port 失败: ${e.message}")
+                throw e
+            } finally {
+                socket.close()
             }
         } catch (e: Exception) {
             println("发送同步通知失败: ${e.message}")
             e.printStackTrace()
-            throw e // 重新抛出异常，让调用者知道发送失败
+            throw e
         }
     }
     
