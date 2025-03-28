@@ -13,6 +13,7 @@ import com.stackfilesync.service.UserDiscoveryService
 import com.stackfilesync.service.UserInfo
 import java.awt.BorderLayout
 import java.awt.Component
+import java.awt.FlowLayout
 import javax.swing.*
 import com.stackfilesync.intellij.window.RepositoriesPanel
 import com.stackfilesync.service.SyncNotificationListener
@@ -36,13 +37,38 @@ class UserDiscoveryPanel(private val project: Project) : JPanel(), UserDiscovery
     private val userListModel = DefaultListModel<UserInfo>()
     private val currentUserLabel = JLabel("当前用户：未知")
     
+    // 缓存存储最近处理过的消息ID
+    private val processedMessageIds = mutableSetOf<String>()
+    
+    // 声明按钮面板为类级别变量，这样updateButtonsState方法可以访问它
+    private val buttonPanel = JPanel()
+    
     init {
         layout = BorderLayout()
         
         // 创建顶部面板显示当前用户信息
         val topPanel = JPanel(BorderLayout())
         topPanel.border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
-        topPanel.add(currentUserLabel, BorderLayout.WEST)
+        
+        // 添加用户信息和发现开关的面板
+        val userInfoPanel = JPanel(FlowLayout(FlowLayout.LEFT))
+        userInfoPanel.add(currentUserLabel)
+        
+        // 添加发现功能开关
+        val discoveryToggleCheckbox = JCheckBox("启用用户发现", userDiscoveryService.isDiscoveryEnabled())
+        discoveryToggleCheckbox.addActionListener {
+            val isEnabled = discoveryToggleCheckbox.isSelected
+            userDiscoveryService.setDiscoveryEnabled(isEnabled)
+            // 如果启用，立即刷新用户列表
+            if (isEnabled) {
+                userDiscoveryService.refreshUserList()
+            }
+            // 更新按钮状态
+            updateButtonsState(isEnabled)
+        }
+        userInfoPanel.add(discoveryToggleCheckbox)
+        
+        topPanel.add(userInfoPanel, BorderLayout.WEST)
         
         // 在顶部面板添加设置按钮
         val settingsButton = JButton("设置")
@@ -65,7 +91,8 @@ class UserDiscoveryPanel(private val project: Project) : JPanel(), UserDiscovery
         mainPanel.add(JBScrollPane(userList), BorderLayout.CENTER)
         
         // 创建按钮面板
-        val buttonPanel = JPanel()
+        // buttonPanel已经在类级别声明，不需要在这里重新声明
+        
         val sendNotificationButton = JButton("发送通知")
         sendNotificationButton.addActionListener {
             val selectedUser = userList.selectedValue
@@ -193,6 +220,9 @@ class UserDiscoveryPanel(private val project: Project) : JPanel(), UserDiscovery
             userDiscoveryService.refreshUserList()
             updateCurrentUserDisplay()
         }
+        
+        // 初始化时设置按钮状态
+        updateButtonsState(userDiscoveryService.isDiscoveryEnabled())
     }
     
     private fun updateCurrentUserDisplay() {
@@ -227,9 +257,25 @@ class UserDiscoveryPanel(private val project: Project) : JPanel(), UserDiscovery
         fromUser: UserInfo, 
         moduleName: String, 
         isBroadcast: Boolean, 
-        remark: String
+        remark: String,
+        messageId: String
     ) {
+        println("UserDiscoveryPanel.onSyncNotificationReceived: 从 ${fromUser.username}, 模块: $moduleName, ID: $messageId")
+        
         SwingUtilities.invokeLater {
+            // 检查消息ID去重
+            if (messageId.isNotBlank() && !processedMessageIds.add(messageId)) {
+                println("忽略重复的同步通知: $messageId")
+                return@invokeLater
+            }
+            
+            // 限制缓存大小，避免内存泄漏
+            if (processedMessageIds.size > 100) {
+                processedMessageIds.clear()
+            }
+            
+            println("处理同步通知对话框: $messageId")
+            
             val messagePrefix = if (isBroadcast) "【广播通知】" else ""
             val remarkText = if (remark.isNotBlank()) "\n\n备注: $remark" else ""
             
@@ -242,8 +288,8 @@ class UserDiscoveryPanel(private val project: Project) : JPanel(), UserDiscovery
             )
             
             val accepted = result == JOptionPane.YES_OPTION
+            println("用户响应: ${if (accepted) "接受" else "拒绝"} 同步请求")
             
-            // 广播消息也发送回执，让发送者知道有多少人接受了同步
             userDiscoveryService.sendSyncResponse(fromUser, moduleName, accepted)
             
             if (accepted) {
@@ -336,5 +382,21 @@ class UserDiscoveryPanel(private val project: Project) : JPanel(), UserDiscovery
             }
             return this
         }
+    }
+    
+    // 添加方法来更新按钮状态
+    private fun updateButtonsState(enabled: Boolean) {
+        // 找到所有需要根据发现功能开关状态禁用/启用的按钮
+        for (component in buttonPanel.components) {
+            if (component is JButton) {
+                // 排除不需要禁用的按钮，比如设置按钮
+                if (component.text != "设置") {
+                    component.isEnabled = enabled
+                }
+            }
+        }
+        
+        // 用户列表是否可选
+        userList.isEnabled = enabled
     }
 } 

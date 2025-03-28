@@ -78,7 +78,6 @@ class AutoSyncManager(private val project: Project) {
         
         // 获取配置
         val repositories = settings.getRepositories()
-        LOG.info("获取到 ${repositories.size} 个仓库配置")
         
         // 启动新任务
         repositories.forEach { repo ->

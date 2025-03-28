@@ -64,6 +64,11 @@ class NetworkDiscoveryService(private val project: Project) {
     }
     
     private fun broadcastSelf() {
+        // 检查功能是否启用
+        if (!userDiscoveryService.isDiscoveryEnabled()) {
+            return
+        }
+        
         val currentUser = userDiscoveryService.getCurrentUser() ?: return
         try {
             val userJson = gson.toJson(NetworkUserInfo(
@@ -86,6 +91,11 @@ class NetworkDiscoveryService(private val project: Project) {
     }
     
     private fun listenForOtherUsers() {
+        // 检查功能是否启用
+        if (!userDiscoveryService.isDiscoveryEnabled()) {
+            return
+        }
+        
         val buffer = ByteArray(4096)
         val packet = DatagramPacket(buffer, buffer.size)
         

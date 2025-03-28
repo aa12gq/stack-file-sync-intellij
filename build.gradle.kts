@@ -1,7 +1,7 @@
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "1.8.21"
-    id("org.jetbrains.intellij") version "1.13.3"
+    kotlin("jvm") version "1.8.0"
+    id("org.jetbrains.intellij") version "1.13.0"
 }
 
 // JVM 参数以支持 TLS
@@ -26,6 +26,8 @@ group = "com.stackfilesync"
 version = "1.3.1"
 
 repositories {
+    maven { url = uri("https://maven.aliyun.com/repository/public") }
+    maven { url = uri("https://repo.huaweicloud.com/repository/maven/") }
     mavenCentral()
     // 阿里云镜像源作为备选
     maven {
@@ -34,14 +36,22 @@ repositories {
     maven {
         url = uri("https://maven.aliyun.com/repository/gradle-plugin")
     }
+    gradlePluginPortal()
 }
 
 // Configure Gradle IntelliJ Plugin
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
 intellij {
-    version.set("2023.1")
-    type.set("IC")
-    plugins.set(listOf("git4idea"))
+    // 尝试使用本地 IDE
+    if (file("/Applications/IntelliJ IDEA.app/Contents").exists()) {
+        localPath.set("/Applications/IntelliJ IDEA.app/Contents")
+    } else {
+        version.set("2023.1")
+        type.set("IC")
+        intellijRepository.set(uri("https://maven.aliyun.com/repository/public"))
+    }
+    
+    downloadSources.set(false)
     updateSinceUntilBuild.set(true)
     sinceBuild.set("231")
     untilBuild.set("233.*")
@@ -125,7 +135,7 @@ tasks.jar {
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(11)
     
     sourceSets.all {
         languageSettings {

@@ -8,9 +8,13 @@ import com.google.gson.Gson
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.DatagramPacket
+import com.intellij.ide.util.PropertiesComponent
 
 @Service(Service.Level.PROJECT)
 class UserDiscoveryService(private val project: Project) {
+    
+    // 用户发现开关
+    private var discoveryEnabled = true
     
     // 存储已连接用户列表
     private val connectedUsers = mutableListOf<UserInfo>()
@@ -24,30 +28,103 @@ class UserDiscoveryService(private val project: Project) {
     // 存储网络发现的用户，使用Map便于快速更新
     private val networkUsers = mutableMapOf<String, UserInfo>()
     
+    // 添加日志级别控制
+    private val LOG_ENABLED = false // 或设置环境变量控制
+    
+    // 优化日志系统
+    enum class LogLevel { DEBUG, INFO, WARN, ERROR }
+
+    private val CURRENT_LOG_LEVEL = LogLevel.WARN // 调整这个级别来控制日志输出
+
+    private fun log(level: LogLevel, message: String) {
+        if (level.ordinal >= CURRENT_LOG_LEVEL.ordinal) {
+            val prefix = when (level) {
+                LogLevel.DEBUG -> "[DEBUG]"
+                LogLevel.INFO -> "[INFO]"
+                LogLevel.WARN -> "[WARN]"
+                LogLevel.ERROR -> "[ERROR]"
+            }
+            println("$prefix $message")
+        }
+    }
+    
+    init {
+        // 从项目配置中读取发现功能开关状态
+        val properties = PropertiesComponent.getInstance(project)
+        discoveryEnabled = properties.getBoolean(DISCOVERY_ENABLED_KEY, true)
+        log(LogLevel.INFO, "用户发现功能状态: ${if (discoveryEnabled) "已启用" else "已禁用"}")
+    }
+    
+    // 设置用户发现功能的开关
+    fun setDiscoveryEnabled(enabled: Boolean) {
+        if (discoveryEnabled != enabled) {
+            discoveryEnabled = enabled
+            // 保存设置以便下次启动时保持状态
+            val properties = PropertiesComponent.getInstance(project)
+            properties.setValue(DISCOVERY_ENABLED_KEY, enabled)
+            
+            log(LogLevel.INFO, "用户发现功能状态已变更为: ${if (enabled) "启用" else "禁用"}")
+            
+            if (enabled) {
+                // 如果启用了功能，刷新用户列表
+                refreshUserList()
+            } else {
+                // 如果禁用了功能，清空用户列表并通知UI更新
+                connectedUsers.clear()
+                networkUsers.clear()
+                // 但保留当前用户
+                currentUser?.let { connectedUsers.add(it) }
+                notifyUserListUpdated()
+            }
+        }
+    }
+    
+    // 获取当前发现功能的状态
+    fun isDiscoveryEnabled(): Boolean {
+        return discoveryEnabled
+    }
+    
     fun initialize(username: String, serverUrl: String) {
         currentUser = UserInfo(generateUniqueId(), username, serverUrl)
-        println("初始化当前用户: ${currentUser?.username}, ID: ${currentUser?.id}")
+        log(LogLevel.INFO, "初始化当前用户: ${currentUser?.username}, ID: ${currentUser?.id}")
         
-        // 向服务器注册当前用户
-        registerUserToServer()
+        // 如果功能启用，向服务器注册当前用户
+        if (discoveryEnabled) {
+            registerUserToServer()
+        }
     }
     
     // 添加公共刷新方法，让UI组件可以主动调用
     fun refreshUserList() {
-        fetchConnectedUsers()
+        if (discoveryEnabled) {
+            fetchConnectedUsers()
+        } else {
+            log(LogLevel.INFO, "用户发现功能已禁用，跳过刷新用户列表")
+        }
     }
     
     private fun registerUserToServer() {
+        // 检查功能是否启用
+        if (!discoveryEnabled) {
+            log(LogLevel.INFO, "用户发现功能已禁用，跳过注册用户")
+            return
+        }
+        
         // 实现向服务器注册用户的逻辑
-        // 可以使用HTTP请求或WebSocket
-        println("正在注册用户: ${currentUser?.username}")
+        log(LogLevel.INFO, "正在注册用户: ${currentUser?.username}")
         
         // 注册成功后获取已连接用户列表
         fetchConnectedUsers()
     }
     
     private fun fetchConnectedUsers() {
-        println("正在获取连接的用户列表")
+        // 检查功能是否启用
+        if (!discoveryEnabled) {
+            log(LogLevel.INFO, "用户发现功能已禁用，跳过获取用户列表")
+            return
+        }
+        
+        log(LogLevel.INFO, "正在获取连接的用户列表")
         
         connectedUsers.clear()
         
@@ -81,14 +158,25 @@ class UserDiscoveryService(private val project: Project) {
             }
         }
         
-        println("获取到 ${connectedUsers.size} 个用户")
+        log(LogLevel.INFO, "获取到 ${connectedUsers.size} 个用户")
         
         // 通知监听器用户列表已更新
         notifyUserListUpdated()
     }
     
     fun sendNotification(toUser: UserInfo, message: String) {
-        println("发送通知给 ${toUser.username}: $message")
+        // 检查功能是否启用
+        if (!discoveryEnabled) {
+            val notificationService = NotificationService.getInstance(project)
+            notificationService.showNotification(
+                "功能已禁用",
+                "用户发现功能已禁用，无法发送通知",
+                NotificationType.WARNING
+            )
+            return
+        }
+        
+        log(LogLevel.INFO, "发送通知给 ${toUser.username}: $message")
         
         // 获取通知服务
         val notificationService = NotificationService.getInstance(project)
@@ -125,7 +213,7 @@ class UserDiscoveryService(private val project: Project) {
     }
     
     private fun notifyUserListUpdated() {
-        println("通知监听器用户列表已更新，监听器数量: ${listeners.size}")
+        log(LogLevel.INFO, "通知监听器用户列表已更新，监听器数量: ${listeners.size}")
         listeners.forEach { it.onUserListUpdated(connectedUsers) }
     }
     
@@ -142,6 +230,12 @@ class UserDiscoveryService(private val project: Project) {
     
     // 添加或更新从网络发现的用户
     fun addOrUpdateNetworkUser(user: UserInfo) {
+        // 检查功能是否启用
+        if (!discoveryEnabled) {
+            log(LogLevel.INFO, "用户发现功能已禁用，跳过添加网络用户")
+            return
+        }
+        
         val isNewUser = !networkUsers.containsKey(user.id)
         networkUsers[user.id] = user
         
@@ -161,6 +255,12 @@ class UserDiscoveryService(private val project: Project) {
     
     // 向远程用户发送通知
     private fun sendRemoteNotification(toUser: UserInfo, message: String) {
+        // 检查功能是否启用
+        if (!discoveryEnabled) {
+            log(LogLevel.INFO, "用户发现功能已禁用，跳过发送远程通知")
+            return
+        }
+        
         try {
             val socket = DatagramSocket()
             val gson = Gson()
@@ -172,7 +272,7 @@ class UserDiscoveryService(private val project: Project) {
             ))
             
             val data = notificationData.toByteArray()
-            // 这里有问题！在本地开发环境中，所有用户都是localhost
+            // todo: 这里有问题！在本地开发环境中，所有用户都是localhost
             // 但是端口可能不正确，或者消息接收服务没有正确监听
             val address = InetAddress.getByName(toUser.serverUrl)
             val packet = DatagramPacket(data, data.size, address, 8889)
@@ -180,28 +280,47 @@ class UserDiscoveryService(private val project: Project) {
             socket.send(packet)
             socket.close()
             
-            println("远程通知已发送到 ${toUser.username} (${toUser.serverUrl})")
+            log(LogLevel.INFO, "远程通知已发送到 ${toUser.username} (${toUser.serverUrl})")
         } catch (e: Exception) {
-            println("发送远程通知失败: ${e.message}")
+            log(LogLevel.ERROR, "发送远程通知失败: ${e.message}")
             e.printStackTrace()
         }
     }
     
     // 处理接收到的通知
     fun handleReceivedNotification(fromUser: UserInfo, message: String) {
+        // 检查功能是否启用
+        if (!discoveryEnabled) {
+            log(LogLevel.INFO, "用户发现功能已禁用，跳过处理接收到的通知")
+            return
+        }
+        
         // 通知监听器收到了消息
         notifyNotificationReceived(fromUser, message)
     }
     
     fun sendSyncNotification(toUser: UserInfo, moduleName: String, remark: String = "") {
-        println("发送同步通知给 ${toUser.username}: 模块 $moduleName 需要同步${if (remark.isNotBlank()) "，备注: $remark" else ""}")
+        // 检查功能是否启用
+        if (!discoveryEnabled) {
+            val notificationService = NotificationService.getInstance(project)
+            notificationService.showNotification(
+                "功能已禁用",
+                "用户发现功能已禁用，无法发送同步通知",
+                NotificationType.WARNING
+            )
+            return
+        }
+        
+        log(LogLevel.INFO, "发送同步通知给 ${toUser.username}: 模块 $moduleName 需要同步${if (remark.isNotBlank()) "，备注: $remark" else ""}")
         
         val notificationService = NotificationService.getInstance(project)
         
+        val messageId = "${System.currentTimeMillis()}-${(1000..9999).random()}"
+        
         if (toUser.id == currentUser?.id) {
-            notifySyncNotificationReceived(currentUser!!, moduleName, false, remark)
+            notifySyncNotificationReceived(currentUser!!, moduleName, false, remark, messageId)
         } else {
-            sendRemoteSyncNotification(toUser, moduleName, false, remark)
+            sendRemoteSyncNotification(toUser, moduleName, false, remark, messageId)
         }
         
         val remarkText = if (remark.isNotBlank()) "（备注: $remark）" else ""
@@ -212,46 +331,68 @@ class UserDiscoveryService(private val project: Project) {
         )
     }
     
-    private fun sendRemoteSyncNotification(toUser: UserInfo, moduleName: String, isBroadcast: Boolean = false, remark: String = "") {
+    private fun sendRemoteSyncNotification(toUser: UserInfo, moduleName: String, isBroadcast: Boolean = false, remark: String = "", messageId: String) {
         try {
-            val socket = DatagramSocket()
-            val gson = Gson()
-            val notificationData = gson.toJson(SyncNotification(
-                fromUserId = currentUser?.id ?: "",
-                fromUsername = currentUser?.username ?: "",
-                moduleName = moduleName,
-                timestamp = System.currentTimeMillis(),
-                isBroadcast = isBroadcast,
-                remark = remark
-            ))
+            // 尝试3次发送
+            var success = false
+            var lastException: Exception? = null
             
-            val data = notificationData.toByteArray()
-            val address = InetAddress.getByName(toUser.serverUrl)
+            for (attempt in 1..3) {
+                try {
+                    val socket = DatagramSocket()
+                    val gson = Gson()
+                    val notificationData = gson.toJson(SyncNotification(
+                        fromUserId = currentUser?.id ?: "",
+                        fromUsername = currentUser?.username ?: "",
+                        moduleName = moduleName,
+                        timestamp = System.currentTimeMillis(),
+                        isBroadcast = isBroadcast,
+                        remark = remark,
+                        messageId = messageId
+                    ))
+                    
+                    val data = notificationData.toByteArray()
+                    val address = InetAddress.getByName(toUser.serverUrl)
+                    
+                    val port = 8890
+                    val packet = DatagramPacket(data, data.size, address, port)
+                    socket.send(packet)
+                    log(LogLevel.INFO, "同步通知已发送到 ${toUser.username} (${toUser.serverUrl}:$port)")
+                    
+                    socket.close()
+                    success = true
+                    break
+                } catch (e: Exception) {
+                    lastException = e
+                    log(LogLevel.ERROR, "发送同步通知失败(尝试 $attempt/3): ${e.message}")
+                    if (attempt < 3) {
+                        Thread.sleep(100) // 稍等一下再重试
+                    }
+                }
+            }
             
-            // 只使用一个固定的端口
-            val port = 8890
-            try {
-                val packet = DatagramPacket(data, data.size, address, port)
-                socket.send(packet)
-                val broadcastText = if (isBroadcast) "(广播)" else ""
-                println("同步通知${broadcastText}已发送到 ${toUser.username} (${toUser.serverUrl}:$port)")
-            } catch (e: Exception) {
-                println("发送到端口 $port 失败: ${e.message}")
-                throw e
-            } finally {
-                socket.close()
+            if (!success && lastException != null) {
+                throw lastException
             }
         } catch (e: Exception) {
-            println("发送同步通知失败: ${e.message}")
+            log(LogLevel.ERROR, "发送同步通知失败: ${e.message}")
             e.printStackTrace()
             throw e
         }
     }
     
-    fun notifySyncNotificationReceived(fromUser: UserInfo, moduleName: String, isBroadcast: Boolean = false, remark: String = "") {
+    fun notifySyncNotificationReceived(fromUser: UserInfo, moduleName: String, isBroadcast: Boolean = false, remark: String = "", messageId: String = "") {
+        log(LogLevel.INFO, "处理同步通知: 从 ${fromUser.username}, 模块: $moduleName, 广播: $isBroadcast, 消息ID: $messageId")
+        
         listeners.forEach { 
             if (it is SyncNotificationListener) {
-                it.onSyncNotificationReceived(fromUser, moduleName, isBroadcast, remark)
+                try {
+                    it.onSyncNotificationReceived(fromUser, moduleName, isBroadcast, remark, messageId)
+                    log(LogLevel.INFO, "通知监听器: ${it.javaClass.simpleName} 成功处理同步通知")
+                } catch (e: Exception) {
+                    log(LogLevel.ERROR, "监听器处理同步通知时出错: ${e.message}")
+                    e.printStackTrace()
+                }
             }
         }
     }
@@ -278,9 +419,9 @@ class UserDiscoveryService(private val project: Project) {
             socket.send(packet)
             socket.close()
             
-            println("同步回执已发送到 ${toUser.username} (${toUser.serverUrl}): $action")
+            log(LogLevel.INFO, "同步回执已发送到 ${toUser.username} (${toUser.serverUrl}): $action")
         } catch (e: Exception) {
-            println("发送同步回执失败: ${e.message}")
+            log(LogLevel.ERROR, "发送同步回执失败: ${e.message}")
             e.printStackTrace()
         }
     }
@@ -295,7 +436,18 @@ class UserDiscoveryService(private val project: Project) {
     
     // 添加广播同步通知方法
     fun broadcastSyncNotification(moduleName: String, remark: String = "") {
-        println("广播同步通知: 模块 $moduleName 需要同步${if (remark.isNotBlank()) "，备注: $remark" else ""}")
+        // 检查功能是否启用
+        if (!discoveryEnabled) {
+            val notificationService = NotificationService.getInstance(project)
+            notificationService.showNotification(
+                "功能已禁用",
+                "用户发现功能已禁用，无法发送广播同步通知",
+                NotificationType.WARNING
+            )
+            return
+        }
+        
+        log(LogLevel.INFO, "广播同步通知: 模块 $moduleName 需要同步${if (remark.isNotBlank()) "，备注: $remark" else ""}")
         
         val notificationService = NotificationService.getInstance(project)
         
@@ -311,14 +463,17 @@ class UserDiscoveryService(private val project: Project) {
             return
         }
         
+        // 生成一个统一的消息ID用于广播
+        val messageId = "${System.currentTimeMillis()}-${(1000..9999).random()}"
+        
         // 向所有用户发送同步通知
         var successCount = 0
         otherUsers.forEach { user ->
             try {
-                sendRemoteSyncNotification(user, moduleName, true, remark)
+                sendRemoteSyncNotification(user, moduleName, true, remark, messageId)
                 successCount++
             } catch (e: Exception) {
-                println("向用户 ${user.username} 发送广播失败: ${e.message}")
+                log(LogLevel.ERROR, "向用户 ${user.username} 发送广播失败: ${e.message}")
             }
         }
         
@@ -333,6 +488,9 @@ class UserDiscoveryService(private val project: Project) {
     
     companion object {
         fun getInstance(project: Project): UserDiscoveryService = project.service()
+        
+        // 设置键名
+        private const val DISCOVERY_ENABLED_KEY = "stack.file.sync.discoveryEnabled"
     }
 }
 
@@ -360,7 +518,8 @@ data class SyncNotification(
     val moduleName: String,
     val timestamp: Long,
     val isBroadcast: Boolean = false,
-    val remark: String = ""
+    val remark: String = "",
+    val messageId: String = ""  // 添加唯一消息ID
 )
 
 data class SyncResponseNotification(
@@ -370,4 +529,14 @@ data class SyncResponseNotification(
     val moduleName: String,
     val action: String, // "ACCEPTED" 或 "REJECTED"
     val timestamp: Long
-) 
+)
+
+interface SyncNotificationListener {
+    fun onSyncNotificationReceived(
+        fromUser: UserInfo, 
+        moduleName: String, 
+        isBroadcast: Boolean, 
+        remark: String,
+        messageId: String = ""
+    )
+} 

@@ -35,7 +35,6 @@ class P2PConnection(
                 return
             }
             
-            LOG.info("正在连接到节点: ${remoteNode.address}:${remoteNode.port}")
             socket = Socket()
             socket?.connect(InetSocketAddress(remoteNode.address, remoteNode.port), 5000)
             socket?.keepAlive = true  // 启用 TCP keepalive
@@ -43,7 +42,6 @@ class P2PConnection(
             
             outputStream = DataOutputStream(BufferedOutputStream(socket?.getOutputStream()))
             inputStream = DataInputStream(BufferedInputStream(socket?.getInputStream()))
-            LOG.info("成功连接到节点")
         } catch (e: Exception) {
             LOG.error("连接失败", e)
             close()
@@ -59,7 +57,6 @@ class P2PConnection(
             socket.soTimeout = 30000
             outputStream = DataOutputStream(BufferedOutputStream(socket.getOutputStream()))
             inputStream = DataInputStream(BufferedInputStream(socket.getInputStream()))
-            LOG.info("成功初始化连接: ${socket.remoteSocketAddress}")
         } catch (e: Exception) {
             LOG.error("初始化连接失败", e)
             close()
