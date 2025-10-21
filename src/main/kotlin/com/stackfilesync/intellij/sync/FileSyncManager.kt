@@ -52,6 +52,8 @@ import com.stackfilesync.intellij.settings.SyncSettingsState
 import javax.swing.DefaultComboBoxModel
 import java.awt.GridLayout
 import com.stackfilesync.intellij.window.RepositoriesPanel
+import com.stackfilesync.intellij.service.RepositoryStatusService
+import com.intellij.openapi.components.service
 
 class FileSyncManager(
     private val project: Project,
@@ -62,6 +64,7 @@ class FileSyncManager(
     private var syncedFiles = mutableListOf<String>()
     private val backupManager = BackupManager(project)
     private val logService = LogService.getInstance(project)
+    private val statusService = project.service<RepositoryStatusService>()
 
     /**
      * 同步仓库文件
@@ -71,16 +74,19 @@ class FileSyncManager(
      * @param moduleFilter 模块过滤器
      */
     fun sync(
-        repository: Repository, 
-        showFileSelection: Boolean = true, 
+        repository: Repository,
+        showFileSelection: Boolean = true,
         isAutoSync: Boolean = false,
         moduleFilter: String? = null
     ) {
         val startTime = System.currentTimeMillis()
         var success = false
         var error: String? = null
-        
+
         try {
+            // 标记仓库为同步中状态
+            statusService.markAsSyncing(repository)
+
             validateConfig(repository)
             
             // 激活主窗口
@@ -155,7 +161,7 @@ class FileSyncManager(
         } finally {
             // 清理临时目录
             tempDir.toFile().deleteRecursively()
-            
+
             // 记录同步历史
             SyncHistoryService.getInstance().addHistoryItem(
                 SyncHistoryService.HistoryItem(
@@ -169,7 +175,10 @@ class FileSyncManager(
                     syncType = if (repository.autoSync?.enabled == true) "auto" else "manual"
                 )
             )
-            
+
+            // 标记同步完成，触发状态检查
+            statusService.markSyncComplete(repository)
+
             // 最重要的：始终确保同步状态被设置为完成
             invokeLater {
                 SyncStateService.getInstance(project).setSyncFinished()

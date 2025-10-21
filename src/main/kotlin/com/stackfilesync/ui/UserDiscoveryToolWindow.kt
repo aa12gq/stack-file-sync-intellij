@@ -90,9 +90,6 @@ class UserDiscoveryPanel(private val project: Project) : JPanel(), UserDiscovery
         val mainPanel = JPanel(BorderLayout())
         mainPanel.add(JBScrollPane(userList), BorderLayout.CENTER)
         
-        // 创建按钮面板
-        // buttonPanel已经在类级别声明，不需要在这里重新声明
-        
         val sendNotificationButton = JButton("发送通知")
         sendNotificationButton.addActionListener {
             val selectedUser = userList.selectedValue

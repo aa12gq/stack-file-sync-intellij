@@ -28,16 +28,29 @@ import javax.swing.JCheckBox
 import com.stackfilesync.intellij.model.AutoSyncConfig
 import com.stackfilesync.intellij.sync.AutoSyncManager
 import javax.swing.JFileChooser
+import com.stackfilesync.intellij.service.RepositoryStatusService
+import com.stackfilesync.intellij.model.RepositoryStatus
+import com.intellij.openapi.components.service
+import java.awt.Component
+import java.awt.Graphics
+import javax.swing.Icon
 
 class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
     private val listModel = DefaultListModel<Repository>()
+    private val statusService = project.service<RepositoryStatusService>()
     private val repositoryList = JBList(listModel).apply {
         selectionMode = ListSelectionModel.SINGLE_SELECTION
-        cellRenderer = RepositoryListCellRenderer()
+        cellRenderer = RepositoryListCellRenderer(statusService)
     }
-    
+
     var isSyncing = false
     val buttonPanel: JPanel
+    private val statusChangeListener: (String, RepositoryStatus) -> Unit = { url, status ->
+        // 当状态变化时，刷新列表显示
+        invokeLater {
+            repositoryList.repaint()
+        }
+    }
 
     init {
         // 创建顶部工具栏
@@ -264,14 +277,23 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         // 设置首选大小
         preferredSize = Dimension(300, 400)
+
+        // 注册状态变化监听器
+        statusService.addStatusChangeListener(statusChangeListener)
+
+        // 初始检查所有仓库状态
+        statusService.checkAllRepositories(listModel.elements().toList())
     }
 
     private fun loadRepositories() {
         listModel.clear()
         val settings = SyncSettingsState.getInstance()
-        settings.getRepositories().forEach { repository ->
+        val repositories = settings.getRepositories()
+        repositories.forEach { repository ->
             listModel.addElement(repository)
         }
+        // 重新检查所有仓库状态
+        statusService.checkAllRepositories(repositories)
     }
 
     fun refresh() {
@@ -287,6 +309,9 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
         syncButton.text = "同步中..."
         fullSyncButton.text = "同步中..."
 
+        // 标记为同步中
+        statusService.markAsSyncing(repository)
+
         ProgressManager.getInstance().run(object : Task.Backgroundable(
             project,
             "同步文件",
@@ -297,6 +322,9 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
                     val syncManager = FileSyncManager(project, indicator)
                     syncManager.sync(repository, showFileSelection, isAutoSync = false)
                 } finally {
+                    // 标记同步完成
+                    statusService.markSyncComplete(repository)
+
                     // 确保在任务完成后（无论成功还是失败）重置按钮状态
                     invokeLater {
                         isSyncing = false
@@ -347,7 +375,7 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
             }
         }
     }
-    
+
     private fun findRepositoryByModule(moduleName: String): Repository? {
         val settings = SyncSettingsState.getInstance()
         return settings.getRepositories().find { repo ->
@@ -357,7 +385,7 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
     }
     
     private fun startSync(
-        repository: Repository, 
+        repository: Repository,
         showFileSelection: Boolean = true,
         moduleFilter: String? = null
     ) {
@@ -369,6 +397,9 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
         syncButton.text = "同步中..."
         fullSyncButton.text = "同步中..."
 
+        // 标记为同步中
+        statusService.markAsSyncing(repository)
+
         ProgressManager.getInstance().run(object : Task.Backgroundable(
             project,
             "同步文件",
@@ -379,6 +410,9 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
                     val syncManager = FileSyncManager(project, indicator)
                     syncManager.sync(repository, showFileSelection, isAutoSync = false, moduleFilter = moduleFilter)
                 } finally {
+                    // 标记同步完成
+                    statusService.markSyncComplete(repository)
+
                     // 确保在任务完成后（无论成功还是失败）重置按钮状态
                     invokeLater {
                         isSyncing = false
@@ -410,7 +444,10 @@ class RepositoriesPanel(private val project: Project) : JPanel(BorderLayout()) {
     }
 }
 
-class RepositoryListCellRenderer : javax.swing.DefaultListCellRenderer() {
+class RepositoryListCellRenderer(
+    private val statusService: RepositoryStatusService
+) : javax.swing.DefaultListCellRenderer() {
+
     override fun getListCellRendererComponent(
         list: javax.swing.JList<*>?,
         value: Any?,
@@ -420,6 +457,9 @@ class RepositoryListCellRenderer : javax.swing.DefaultListCellRenderer() {
     ): java.awt.Component {
         super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
         if (value is Repository) {
+            val statusInfo = statusService.getStatusInfo(value)
+            val status = statusInfo.status
+
             // 显示仓库名称和自动同步状态
             text = buildString {
                 append(value.name)
@@ -427,18 +467,52 @@ class RepositoryListCellRenderer : javax.swing.DefaultListCellRenderer() {
                     append(" [自动同步已开启]")
                 }
             }
-            icon = AllIcons.Nodes.Module
-            
+
+            // 使用带状态颜色的图标
+            icon = StatusIcon(status)
+
             // 设置提示信息
             toolTipText = buildString {
-                append("仓库: ${value.name}")
-                append("\n源目录: ${value.sourceDirectory}")
-                append("\n目标目录: ${value.targetDirectory}")
-                if (value.autoSync?.enabled == true) {
-                    append("\n自动同步: 已开启 (间隔: ${value.autoSync?.interval ?: 300}秒)")
+                append("<html>")
+                append("<b>仓库:</b> ${value.name}<br>")
+                append("<b>状态:</b> ${status.displayName}<br>")
+
+                // 显示详细的状态描述
+                if (!statusInfo.detailMessage.isNullOrBlank()) {
+                    append("<b>详情:</b> ${statusInfo.detailMessage}<br>")
+                } else {
+                    append("<b>描述:</b> ${status.description}<br>")
                 }
+
+                append("<b>源目录:</b> ${value.sourceDirectory}<br>")
+                append("<b>目标目录:</b> ${value.targetDirectory}<br>")
+
+                if (value.autoSync?.enabled == true) {
+                    append("<b>自动同步:</b> 已开启 (间隔: ${value.autoSync?.interval ?: 300}秒)")
+                }
+                append("</html>")
             }
         }
         return this
+    }
+
+    /**
+     * 状态指示器图标
+     */
+    private class StatusIcon(private val status: RepositoryStatus) : Icon {
+        override fun getIconWidth(): Int = 16
+        override fun getIconHeight(): Int = 16
+
+        override fun paintIcon(c: Component?, g: Graphics?, x: Int, y: Int) {
+            if (g == null) return
+
+            // 绘制圆形状态指示器
+            g.color = status.color
+            g.fillOval(x + 2, y + 2, 12, 12)
+
+            // 绘制边框
+            g.color = status.color.darker()
+            g.drawOval(x + 2, y + 2, 12, 12)
+        }
     }
 } 
