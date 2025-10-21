@@ -15,18 +15,21 @@ import (
 	"github.com/eiannone/keyboard"
 	"github.com/stackfilesync/stack-sync-cli/internal/config"
 	"github.com/stackfilesync/stack-sync-cli/internal/git"
+	"github.com/stackfilesync/stack-sync-cli/internal/i18n"
 	"github.com/stackfilesync/stack-sync-cli/pkg/models"
 )
 
 // Manager handles repository synchronization (matches IntelliJ plugin)
 type Manager struct {
 	config *config.Config
+	i18n   *i18n.I18n
 }
 
 // NewManager creates a new sync manager
-func NewManager(cfg *config.Config) *Manager {
+func NewManager(cfg *config.Config, i18nInstance *i18n.I18n) *Manager {
 	return &Manager{
 		config: cfg,
+		i18n:   i18nInstance,
 	}
 }
 
@@ -592,7 +595,7 @@ func (m *Manager) selectFilesToSync(availableFiles []string, sourcePath string) 
 		return []string{}, nil
 	}
 
-	fmt.Println("\n📁 Available files to sync:")
+	fmt.Printf("\n📁 %s\n", m.i18n.T(i18n.MsgAvailableFilesToSync))
 	fmt.Println("────────────────────────────────────────")
 
 	// Show all files - no limit for better user experience
@@ -600,15 +603,15 @@ func (m *Manager) selectFilesToSync(availableFiles []string, sourcePath string) 
 		fmt.Printf("  %d. %s\n", i+1, file)
 	}
 
-	fmt.Println("\nSelection modes:")
-	fmt.Println("  [k] - Keyboard mode (↑↓ navigate, Space select, Enter confirm)")
-	fmt.Println("  [n] - Number mode (1,2,3 or 1-3 or 1,3,5)")
-	fmt.Println("  [a] - Select all files")
-	fmt.Println("  [f] - Filter by keyword")
-	fmt.Println("  [c] - Cancel (select none)")
+	fmt.Printf("\n%s\n", m.i18n.T(i18n.MsgSelectionModes))
+	fmt.Printf("  %s\n", m.i18n.T(i18n.MsgKeyboardMode))
+	fmt.Printf("  %s\n", m.i18n.T(i18n.MsgNumberMode))
+	fmt.Printf("  %s\n", m.i18n.T(i18n.MsgSelectAllFiles))
+	fmt.Printf("  %s\n", m.i18n.T(i18n.MsgFilterByKeyword))
+	fmt.Printf("  %s\n", m.i18n.T(i18n.MsgCancel))
 	fmt.Println("  [Enter] - Select all files")
 
-	fmt.Print("\nChoose selection mode: ")
+	fmt.Printf("\n%s ", m.i18n.T(i18n.MsgChooseSelectionMode))
 	var input string
 	fmt.Scanln(&input)
 
@@ -909,15 +912,43 @@ func (m *Manager) selectFilesWithKeyboard(availableFiles []string) ([]string, er
 	}
 }
 
-// renderFileSelection renders the file selection interface
+// renderFileSelection renders the file selection interface with viewport
 func (m *Manager) renderFileSelection(availableFiles []string, selectedFiles map[int]bool, currentIndex int) {
 	// Clear screen
 	fmt.Print("\033[2J\033[H")
 
-	fmt.Println("📁 Select files to sync (Use ↑↓ to navigate, Space to select, Enter to confirm)")
+	fmt.Printf("📁 %s\n", m.i18n.T(i18n.MsgSelectFilesToSync))
 	fmt.Println("─────────────────────────────────────────────────────────────────────────────")
 
-	for i, file := range availableFiles {
+	// Get terminal height (default to 24 if unable to detect)
+	terminalHeight := m.getTerminalHeight()
+
+	// Calculate viewport size (leave space for header, footer, and controls)
+	maxVisibleItems := terminalHeight - 8 // Reserve space for header, footer, controls
+
+	// Calculate start and end indices for visible items
+	startIndex := 0
+	endIndex := len(availableFiles)
+
+	if len(availableFiles) > maxVisibleItems {
+		// Center the current item in the viewport
+		halfViewport := maxVisibleItems / 2
+		startIndex = currentIndex - halfViewport
+		endIndex = currentIndex + halfViewport + 1
+
+		// Adjust if we're near the beginning or end
+		if startIndex < 0 {
+			startIndex = 0
+			endIndex = maxVisibleItems
+		}
+		if endIndex > len(availableFiles) {
+			endIndex = len(availableFiles)
+			startIndex = endIndex - maxVisibleItems
+		}
+	}
+
+	// Show visible files
+	for i := startIndex; i < endIndex; i++ {
 		prefix := "  "
 		if i == currentIndex {
 			prefix = "▶ " // Highlight current item
@@ -928,11 +959,21 @@ func (m *Manager) renderFileSelection(availableFiles []string, selectedFiles map
 			status = "✓" // Show selected items
 		}
 
-		fmt.Printf("%s%s %s\n", prefix, status, file)
+		fmt.Printf("%s%s %s\n", prefix, status, availableFiles[i])
+	}
+
+	// Show scroll indicator if there are more items
+	if len(availableFiles) > maxVisibleItems {
+		if startIndex > 0 {
+			fmt.Println("... ↑ more files above ↑ ...")
+		}
+		if endIndex < len(availableFiles) {
+			fmt.Println("... ↓ more files below ↓ ...")
+		}
 	}
 
 	fmt.Println("─────────────────────────────────────────────────────────────────────────────")
-	fmt.Println("Controls: ↑↓ Navigate | Space Toggle | Enter Confirm | Esc Cancel | a All | n None | q Quit")
+	fmt.Println(m.i18n.T(i18n.MsgControls))
 
 	// Show selection count
 	selectedCount := 0
@@ -941,5 +982,28 @@ func (m *Manager) renderFileSelection(availableFiles []string, selectedFiles map
 			selectedCount++
 		}
 	}
-	fmt.Printf("Selected: %d/%d files\n", selectedCount, len(availableFiles))
+	fmt.Printf("%s\n", m.i18n.T(i18n.MsgSelectedFiles, selectedCount, len(availableFiles)))
+}
+
+// getTerminalHeight returns the terminal height, defaulting to 24 if unable to detect
+func (m *Manager) getTerminalHeight() int {
+	// Try to get terminal size using system call
+	// This is a simple approach that works on most Unix-like systems
+	cmd := exec.Command("stty", "size")
+	output, err := cmd.Output()
+	if err != nil {
+		// Fallback to default if stty fails
+		return 24
+	}
+
+	// Parse output (format: "rows cols")
+	parts := strings.Fields(string(output))
+	if len(parts) >= 1 {
+		if height, err := strconv.Atoi(parts[0]); err == nil && height > 0 {
+			return height
+		}
+	}
+
+	// Fallback to default
+	return 24
 }

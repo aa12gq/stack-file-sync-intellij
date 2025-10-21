@@ -95,6 +95,19 @@ const (
 	MsgFailedToCreateWatcher MessageKey = "error.failed_to_create_watcher"
 	MsgFailedToStartWatcher  MessageKey = "error.failed_to_start_watcher"
 	MsgUsageRemove           MessageKey = "error.usage_remove"
+
+	// File Selection Messages
+	MsgAvailableFilesToSync MessageKey = "file_selection.available_files"
+	MsgSelectionModes       MessageKey = "file_selection.selection_modes"
+	MsgChooseSelectionMode  MessageKey = "file_selection.choose_mode"
+	MsgSelectFilesToSync    MessageKey = "file_selection.select_files"
+	MsgControls             MessageKey = "file_selection.controls"
+	MsgKeyboardMode         MessageKey = "file_selection.keyboard_mode"
+	MsgNumberMode           MessageKey = "file_selection.number_mode"
+	MsgSelectAllFiles       MessageKey = "file_selection.select_all"
+	MsgFilterByKeyword      MessageKey = "file_selection.filter_keyword"
+	MsgCancel               MessageKey = "file_selection.cancel"
+	MsgSelectedFiles        MessageKey = "file_selection.selected_files"
 )
 
 // Language represents a supported language
@@ -159,52 +172,6 @@ func (i *I18n) T(key MessageKey, args ...interface{}) string {
 		return fmt.Sprintf(message, args...)
 	}
 	return message
-}
-
-// IsChineseCommand checks if a command is a Chinese command
-func (i *I18n) IsChineseCommand(command string) bool {
-	if i.currentLanguage != Chinese {
-		return false
-	}
-
-	chineseCommands := map[string]string{
-		"初始化": "init",
-		"同步":  "sync",
-		"列表":  "list",
-		"添加":  "add",
-		"删除":  "remove",
-		"状态":  "status",
-		"监控":  "watch",
-		"帮助":  "help",
-		"版本":  "version",
-	}
-
-	_, exists := chineseCommands[command]
-	return exists
-}
-
-// TranslateCommand translates a Chinese command to English
-func (i *I18n) TranslateCommand(command string) string {
-	if i.currentLanguage != Chinese {
-		return command
-	}
-
-	chineseCommands := map[string]string{
-		"初始化": "init",
-		"同步":  "sync",
-		"列表":  "list",
-		"添加":  "add",
-		"删除":  "remove",
-		"状态":  "status",
-		"监控":  "watch",
-		"帮助":  "help",
-		"版本":  "version",
-	}
-
-	if translated, exists := chineseCommands[command]; exists {
-		return translated
-	}
-	return command
 }
 
 // initMessages initializes all message translations
@@ -296,6 +263,19 @@ func (i *I18n) initMessages() {
 		MsgFailedToCreateWatcher: "Failed to create watcher: %v",
 		MsgFailedToStartWatcher:  "Failed to start watcher: %v",
 		MsgUsageRemove:           "Usage: stack-sync remove <repository-name>",
+
+		// File Selection Messages
+		MsgAvailableFilesToSync: "Available files to sync:",
+		MsgSelectionModes:       "Selection modes:",
+		MsgChooseSelectionMode:  "Choose selection mode:",
+		MsgSelectFilesToSync:    "Select files to sync (Use ↑↓ to navigate, Space to select, Enter to confirm)",
+		MsgControls:             "Controls: ↑↓ Navigate | Space Toggle | Enter Confirm | Esc Cancel | a All | n None | q Quit",
+		MsgKeyboardMode:         "[k] - Keyboard mode (↑↓ navigate, Space select, Enter confirm)",
+		MsgNumberMode:           "[n] - Number mode (1,2,3 or 1-3 or 1,3,5)",
+		MsgSelectAllFiles:       "[a] - Select all files",
+		MsgFilterByKeyword:      "[f] - Filter by keyword",
+		MsgCancel:               "[c] - Cancel (select none)",
+		MsgSelectedFiles:        "Selected: %d/%d files",
 	}
 
 	// Chinese messages
@@ -385,6 +365,19 @@ func (i *I18n) initMessages() {
 		MsgFailedToCreateWatcher: "创建监控器失败：%v",
 		MsgFailedToStartWatcher:  "启动监控器失败：%v",
 		MsgUsageRemove:           "用法：stack-sync 删除 <仓库名称>",
+
+		// File Selection Messages
+		MsgAvailableFilesToSync: "可同步的文件：",
+		MsgSelectionModes:       "选择模式：",
+		MsgChooseSelectionMode:  "选择模式：",
+		MsgSelectFilesToSync:    "选择要同步的文件（使用 ↑↓ 导航，空格选择，回车确认）",
+		MsgControls:             "控制：↑↓ 导航 | 空格 切换 | 回车 确认 | Esc 取消 | a 全选 | n 全不选 | q 退出",
+		MsgKeyboardMode:         "[k] - 键盘模式（↑↓ 导航，空格选择，回车确认）",
+		MsgNumberMode:           "[n] - 数字模式（1,2,3 或 1-3 或 1,3,5）",
+		MsgSelectAllFiles:       "[a] - 选择所有文件",
+		MsgFilterByKeyword:      "[f] - 按关键词过滤",
+		MsgCancel:               "[c] - 取消（不选择任何文件）",
+		MsgSelectedFiles:        "已选择：%d/%d 个文件",
 	}
 }
 
