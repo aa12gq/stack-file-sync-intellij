@@ -5,7 +5,7 @@
 
 set -e
 
-VERSION="1.1.0"
+VERSION="1.1.3"
 BUILD_DIR="build"
 APP_NAME="stack-sync"
 
@@ -25,7 +25,7 @@ mkdir -p "$BUILD_DIR"
 echo -e "\n${YELLOW}Building for current platform...${NC}"
 go build -o "$BUILD_DIR/$APP_NAME" ./cmd/stack-sync
 echo -e "${GREEN}✓ Built: $BUILD_DIR/$APP_NAME${NC}"
-
+    
 # Cross-compile for other platforms
 PLATFORMS=(
     "darwin/amd64"

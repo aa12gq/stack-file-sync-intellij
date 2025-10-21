@@ -269,6 +269,156 @@ func (m *Manager) SyncRepositoryWithFilter(repo *models.Repository, filterKeywor
 	return nil
 }
 
+// SyncRepositoryWithNumberSelection synchronizes a repository with pre-selected file numbers
+func (m *Manager) SyncRepositoryWithNumberSelection(repo *models.Repository, filterKeyword, numberSelection string) error {
+	repo.Status = models.StatusSyncing
+
+	// Create temp directory for cloning
+	tempDir, err := os.MkdirTemp("", "stack-sync-*")
+	if err != nil {
+		repo.Status = models.StatusError
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Clone repository to temp directory
+	fmt.Printf("Cloning %s @ %s to temp directory...\n", repo.URL, repo.Branch)
+	ops, err := git.Clone(repo, tempDir)
+	if err != nil {
+		repo.Status = models.StatusError
+		return fmt.Errorf("failed to clone repository: %w", err)
+	}
+
+	// Checkout specified branch
+	if repo.Branch != "" && repo.Branch != "main" && repo.Branch != "master" {
+		fmt.Printf("Checking out branch: %s\n", repo.Branch)
+		if err := ops.CheckoutBranch(repo.Branch); err != nil {
+			repo.Status = models.StatusError
+			return fmt.Errorf("failed to checkout branch %s: %w", repo.Branch, err)
+		}
+	}
+
+	// Backup if enabled
+	if repo.BackupConfig != nil && repo.BackupConfig.Enabled && m.directoryExists(repo.TargetDirectory) {
+		if err := m.BackupRepository(repo); err != nil {
+			fmt.Printf("Warning: backup failed: %v\n", err)
+		}
+	}
+
+	// Determine source path
+	sourcePath := tempDir
+	if repo.SourceDirectory != "" {
+		sourcePath = filepath.Join(tempDir, repo.SourceDirectory)
+	}
+
+	// Check if source directory exists
+	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+		repo.Status = models.StatusError
+		return fmt.Errorf("source directory does not exist: %s", repo.SourceDirectory)
+	}
+
+	// Ensure target directory exists
+	if err := os.MkdirAll(repo.TargetDirectory, 0755); err != nil {
+		repo.Status = models.StatusError
+		return fmt.Errorf("failed to create target directory: %w", err)
+	}
+
+	// Scan files
+	fmt.Printf("Scanning files in %s...\n", sourcePath)
+	availableFiles, err := m.scanFiles(sourcePath, repo.FilePatterns, repo.ExcludePatterns)
+	if err != nil {
+		repo.Status = models.StatusError
+		return fmt.Errorf("failed to scan files: %w", err)
+	}
+
+	if len(availableFiles) == 0 {
+		fmt.Printf("No files found matching patterns: %v\n", repo.FilePatterns)
+		repo.Status = models.StatusUpToDate
+		return nil
+	}
+
+	// Apply pre-filter if provided
+	if filterKeyword != "" {
+		filteredFiles := m.preFilterFilesByKeyword(availableFiles, filterKeyword)
+		if len(filteredFiles) == 0 {
+			fmt.Printf("No files found matching filter keyword: %s\n", filterKeyword)
+			repo.Status = models.StatusUpToDate
+			return nil
+		}
+		fmt.Printf("Pre-filtered to %d files matching '%s'\n", len(filteredFiles), filterKeyword)
+		availableFiles = filteredFiles
+	}
+
+	// Show files and auto-select using number selection
+	fmt.Printf("Found %d files to sync:\n", len(availableFiles))
+	selectedFiles, err := m.selectFilesWithNumberSelection(availableFiles, sourcePath, numberSelection)
+	if err != nil {
+		repo.Status = models.StatusError
+		return fmt.Errorf("file selection failed: %w", err)
+	}
+
+	if len(selectedFiles) == 0 {
+		fmt.Printf("No files selected for sync\n")
+		repo.Status = models.StatusUpToDate
+		return nil
+	}
+
+	// Copy selected files from source to target
+	fmt.Printf("Syncing %d selected files from %s to %s...\n", len(selectedFiles), sourcePath, repo.TargetDirectory)
+	copiedFiles, err := m.copySelectedFiles(sourcePath, repo.TargetDirectory, selectedFiles)
+	if err != nil {
+		repo.Status = models.StatusError
+		return fmt.Errorf("failed to copy files: %w", err)
+	}
+
+	fmt.Printf("Synced %d files\n", copiedFiles)
+
+	// Update status
+	repo.Status = models.StatusUpToDate
+	now := time.Now()
+	repo.LastSync = &now
+	repo.FilesTracked = copiedFiles
+
+	// Execute post-sync commands
+	if len(repo.PostSyncCommands) > 0 {
+		if err := m.executePostSyncCommands(repo); err != nil {
+			fmt.Printf("Warning: post-sync command failed: %v\n", err)
+		}
+	}
+
+	return nil
+}
+
+// selectFilesWithNumberSelection shows files and automatically selects using number selection
+func (m *Manager) selectFilesWithNumberSelection(availableFiles []string, sourcePath string, numberSelection string) ([]string, error) {
+	if len(availableFiles) == 0 {
+		return []string{}, nil
+	}
+
+	fmt.Printf("\n📁 %s\n", m.i18n.T(i18n.MsgAvailableFilesToSync))
+	fmt.Println("────────────────────────────────────────")
+
+	// Show all files
+	for i, file := range availableFiles {
+		fmt.Printf("  %d. %s\n", i+1, file)
+	}
+
+	fmt.Printf("\n🔢 Auto-selecting files using: %s\n", numberSelection)
+
+	// Parse the number selection
+	selectedFiles, err := m.parseFileSelection(numberSelection, availableFiles)
+	if err != nil {
+		return nil, fmt.Errorf("invalid number selection '%s': %w", numberSelection, err)
+	}
+
+	fmt.Printf("Selected %d files:\n", len(selectedFiles))
+	for _, file := range selectedFiles {
+		fmt.Printf("  ✓ %s\n", file)
+	}
+
+	return selectedFiles, nil
+}
+
 // preFilterFilesByKeyword filters files by keyword (for command line -f option)
 func (m *Manager) preFilterFilesByKeyword(availableFiles []string, keyword string) []string {
 	var filtered []string
