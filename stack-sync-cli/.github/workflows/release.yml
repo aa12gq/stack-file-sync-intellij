@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.25"
+
+      - name: Get version
+        id: get_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION"
+
+      - name: Build binaries
+        run: |
+          chmod +x scripts/build.sh
+          ./scripts/build.sh
+
+      - name: Create checksums
+        run: |
+          cd build
+          sha256sum stack-sync-* > checksums.txt
+          cat checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ steps.get_version.outputs.version }}
+          body: |
+            ## Stack Sync CLI v${{ steps.get_version.outputs.version }}
+
+            ### What's New
+            - Interactive terminal UI with file selection
+            - Multi-repository management support
+            - File watching and auto-sync capabilities
+            - Cross-platform support (macOS, Linux, Windows)
+
+            ### Installation
+
+            **Quick Install:**
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/stackfilesync/stack-sync-cli/main/scripts/install.sh | bash
+            ```
+
+            **Using Go:**
+            ```bash
+            go install github.com/stackfilesync/stack-sync-cli/cmd/stack-sync@latest
+            ```
+
+            ### Downloads
+            See the assets below for platform-specific binaries.
+
+            ### Getting Started
+            1. Initialize: `stack-sync init`
+            2. Add repo: `stack-sync add`
+            3. Sync: `stack-sync sync <repo-name>`
+          files: |
+            build/stack-sync-*
+            build/checksums.txt
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
