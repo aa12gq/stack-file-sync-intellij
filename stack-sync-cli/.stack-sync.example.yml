@@ -1,0 +1,157 @@
+# Example Stack Sync Configuration
+# Copy this file to ~/.stack-sync/config.yml and customize
+
+# Sync server configuration (optional)
+server:
+  url: "wss://sync-server.example.com"
+  api_key: ""
+
+# Global settings
+settings:
+  # Enable watch mode globally (default: false)
+  watch_mode: false
+
+  # Auto sync interval in seconds (when watch mode is enabled)
+  auto_sync_interval: 30
+
+  # Enable backup before sync
+  backup_enabled: true
+  backup_dir: "~/.stack-sync/backups"
+
+  # UI settings
+  show_icons: true
+  color_output: true
+
+# Repository configurations
+repositories:
+  # Example 1: SSH authentication (using SSH key)
+  - name: "my-backend"
+    url: "git@github.com:user/backend.git"
+    local_path: "/Users/username/projects/backend"
+    repo_type: "SSH"  # Optional: auto-detected from URL
+
+    # Enable watch mode for this repository
+    watch_mode: true
+
+    # Only sync files matching these patterns
+    sync_patterns:
+      - "src/**/*.go"
+      - "pkg/**/*.go"
+      - "cmd/**/*.go"
+      - "*.md"
+      - "go.mod"
+      - "go.sum"
+
+    # Exclude these patterns
+    exclude:
+      - "*.log"
+      - "*.tmp"
+      - "vendor/"
+      - "bin/"
+      - ".DS_Store"
+
+  # Example 2: HTTPS with username/password
+  - name: "frontend-app"
+    url: "https://github.com/user/frontend.git"
+    local_path: "/Users/username/projects/frontend"
+    repo_type: "HTTPS"  # Optional: auto-detected from URL
+    username: "your-username"
+    password: "your-password"  # Or use Personal Access Token
+
+    # No watch mode for this repository
+    watch_mode: false
+
+    sync_patterns:
+      - "src/**/*.ts"
+      - "src/**/*.tsx"
+      - "src/**/*.css"
+      - "package.json"
+      - "tsconfig.json"
+
+    exclude:
+      - "node_modules/"
+      - "dist/"
+      - "build/"
+      - ".next/"
+
+  # Example 3: HTTPS with Personal Access Token (recommended for private repos)
+  - name: "private-repo"
+    url: "https://vcs.intra.example.com/team/project.git"
+    local_path: "/Users/username/projects/private-repo"
+    repo_type: "HTTPS"
+    username: "git"  # Can be any value when using token
+    password: "ghp_xxxxxxxxxxxxxxxxxxxx"  # Personal Access Token
+
+    sync_patterns:
+      - "**/*.proto"
+
+    exclude: []
+
+  # Example 4: Mobile app (SSH)
+  - name: "mobile-app"
+    url: "git@github.com:user/mobile.git"
+    local_path: "/Users/username/projects/mobile"
+    watch_mode: false
+
+    sync_patterns:
+      - "lib/**/*.dart"
+      - "android/**/*.kt"
+      - "ios/**/*.swift"
+      - "pubspec.yaml"
+
+    exclude:
+      - "build/"
+      - ".dart_tool/"
+      - ".flutter-plugins"
+
+  # Example 5: Documentation repo (HTTPS, public)
+  - name: "docs"
+    url: "https://github.com/user/docs.git"
+    local_path: "/Users/username/projects/docs"
+    watch_mode: true  # Auto-sync documentation
+    # No username/password needed for public repos
+
+    sync_patterns:
+      - "**/*.md"
+      - "**/*.mdx"
+      - "docs/**/*"
+
+    exclude:
+      - ".docusaurus/"
+      - "node_modules/"
+
+  # Example 6: Shared library (SSH)
+  - name: "shared-lib"
+    url: "git@github.com:user/shared-lib.git"
+    local_path: "/Users/username/projects/shared-lib"
+    watch_mode: false
+
+    # Sync all files (no patterns specified)
+    sync_patterns: []
+
+    exclude:
+      - "target/"
+      - "*.class"
+
+# Notes:
+# - Watch mode can be enabled globally or per-repository
+# - Per-repository settings override global settings
+# - Use sync_patterns to filter which files to sync
+# - Empty sync_patterns means sync all files
+# - Local paths should be absolute paths
+#
+# Authentication:
+# - SSH: Uses SSH key from ~/.ssh/id_rsa (default)
+#   - URL format: git@github.com:user/repo.git or ssh://git@github.com/user/repo.git
+#   - No username/password needed
+#   - Make sure your SSH key is added to ssh-agent
+#
+# - HTTPS with credentials:
+#   - URL format: https://github.com/user/repo.git
+#   - Set username and password fields
+#   - For private repos, use Personal Access Token as password
+#   - Some Git servers accept any username when using token (e.g., "git")
+#
+# - HTTPS without credentials (public repos only):
+#   - URL format: https://github.com/user/repo.git
+#   - No username/password needed
