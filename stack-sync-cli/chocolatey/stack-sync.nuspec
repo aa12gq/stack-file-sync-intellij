@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>stack-sync</id>
+    <version>1.1.0</version>
+    <title>Stack Sync CLI</title>
+    <authors>Stack File Sync Team</authors>
+    <owners>Stack File Sync Team</owners>
+    <projectUrl>https://github.com/stackfilesync/stack-sync-cli</projectUrl>
+    <description>Interactive file synchronization tool for development teams</description>
+    <summary>CLI tool for synchronizing files across development environments</summary>
+    <licenseUrl>https://github.com/stackfilesync/stack-sync-cli/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <tags>development sync cli tool</tags>
+    <releaseNotes>Initial release with interactive UI and multi-platform support</releaseNotes>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

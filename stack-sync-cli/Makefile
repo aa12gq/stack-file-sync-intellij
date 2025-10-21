@@ -1,6 +1,6 @@
 # Stack Sync CLI
 APP_NAME=stack-sync
-VERSION=1.0.0
+VERSION=1.1.0
 
 # Build output directory
 BUILD_DIR=build

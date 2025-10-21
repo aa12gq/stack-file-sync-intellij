@@ -16,7 +16,57 @@
 
 ## Installation
 
-### From Source
+### 🚀 Quick Install (Recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/stackfilesync/stack-sync-cli/main/scripts/install.sh | bash
+```
+
+### 📦 Package Managers
+
+#### macOS
+
+```bash
+# Homebrew (if you have a custom tap)
+brew tap YOUR_USERNAME/stack-sync
+brew install stack-sync
+
+# Or if submitted to Homebrew Core
+brew install stack-sync
+```
+
+#### Windows
+
+```bash
+# Scoop
+scoop bucket add YOUR_BUCKET_NAME
+scoop install stack-sync
+
+# Chocolatey
+choco install stack-sync
+```
+
+#### Linux
+
+```bash
+# Snap
+sudo snap install stack-sync
+
+# Arch Linux (AUR)
+yay -S stack-sync-cli
+# or
+paru -S stack-sync-cli
+```
+
+### 🔧 Manual Installation
+
+#### Using Go Install
+
+```bash
+go install github.com/stackfilesync/stack-sync-cli/cmd/stack-sync@latest
+```
+
+#### From Source
 
 ```bash
 # Clone the repository
@@ -30,17 +80,9 @@ go build -o stack-sync ./cmd/stack-sync
 sudo mv stack-sync /usr/local/bin/
 ```
 
-### Using Install Script
+#### Download Binaries
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/stackfilesync/stack-sync-cli/main/scripts/install.sh | bash
-```
-
-### Using Go Install
-
-```bash
-go install github.com/stackfilesync/stack-sync-cli/cmd/stack-sync@latest
-```
+Visit [GitHub Releases](https://github.com/stackfilesync/stack-sync-cli/releases) to download pre-built binaries for your platform.
 
 ## Quick Start
 
@@ -175,7 +217,7 @@ repositories:
   - name: "frontend-app"
     url: "https://github.com/user/frontend.git"
     local_path: "/Users/aa12/projects/frontend"
-    watch_mode: false  # No auto-sync for this repo
+    watch_mode: false # No auto-sync for this repo
 
     sync_patterns:
       - "src/**/*.ts"
@@ -195,7 +237,7 @@ Enable in config:
 
 ```yaml
 settings:
-  watch_mode: true  # Enable for all repositories
+  watch_mode: true # Enable for all repositories
 ```
 
 ### Per-Repository Watch Mode
@@ -203,7 +245,7 @@ settings:
 ```yaml
 repositories:
   - name: "my-repo"
-    watch_mode: true  # Enable only for this repo
+    watch_mode: true # Enable only for this repo
 ```
 
 ### Start Watcher
@@ -213,6 +255,7 @@ stack-sync watch
 ```
 
 The watcher will:
+
 - Monitor all repositories with `watch_mode: true`
 - Debounce file changes (2 second delay)
 - Auto-sync when files matching patterns change

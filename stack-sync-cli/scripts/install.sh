@@ -9,7 +9,13 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Configuration
+REPO="stackfilesync/stack-sync-cli"
+BINARY_NAME="stack-sync"
+INSTALL_DIR="/usr/local/bin"
 
 # Detect OS and architecture
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -41,70 +47,140 @@ case $OS in
         ;;
 esac
 
-echo -e "${GREEN}Stack Sync CLI Installer${NC}"
+echo -e "${GREEN}🚀 Stack Sync CLI Installer${NC}"
 echo "================================"
 echo "OS: $OS"
 echo "Architecture: $ARCH"
 echo ""
 
-# Check if Go is installed
-if ! command -v go &> /dev/null; then
-    echo -e "${YELLOW}Go is not installed. Installing from source...${NC}"
+# Function to get latest release
+get_latest_release() {
+    curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+}
 
-    # Clone and build
+# Function to download binary
+download_binary() {
+    local version=$1
+    local url="https://github.com/$REPO/releases/download/$version/stack-sync-$OS-$ARCH"
+    
+    if [ "$OS" = "windows" ]; then
+        url="${url}.exe"
+    fi
+    
+    echo "Downloading from: $url"
+    curl -L -o "$BINARY_NAME" "$url"
+    chmod +x "$BINARY_NAME"
+}
+
+# Check if Go is installed
+if command -v go &> /dev/null; then
+    echo -e "${BLUE}📦 Installing via Go...${NC}"
+    
+    # Try to install via Go first
+    if go install "github.com/$REPO/cmd/stack-sync@latest" 2>/dev/null; then
+        echo -e "${GREEN}✓ Installed via Go successfully!${NC}"
+        
+        # Check if GOPATH/bin is in PATH
+        if [[ ":$PATH:" != *":$HOME/go/bin:"* ]]; then
+            echo -e "${YELLOW}⚠️  Warning: $HOME/go/bin is not in your PATH${NC}"
+            echo "Add this to your ~/.bashrc or ~/.zshrc:"
+            echo "  export PATH=\$PATH:\$HOME/go/bin"
+        fi
+        
+        INSTALLED=true
+    else
+        echo -e "${YELLOW}⚠️  Go install failed, trying binary download...${NC}"
+        INSTALLED=false
+    fi
+else
+    echo -e "${YELLOW}⚠️  Go not found, downloading binary...${NC}"
+    INSTALLED=false
+fi
+
+# If Go install failed or not available, download binary
+if [ "$INSTALLED" != true ]; then
+    echo -e "${BLUE}📥 Downloading latest release...${NC}"
+    
+    # Get latest version
+    LATEST_VERSION=$(get_latest_release)
+    if [ -z "$LATEST_VERSION" ]; then
+        echo -e "${RED}❌ Failed to get latest version${NC}"
+        exit 1
+    fi
+    
+    echo "Latest version: $LATEST_VERSION"
+    
+    # Create temp directory
     TEMP_DIR=$(mktemp -d)
     cd "$TEMP_DIR"
-
-    echo "Cloning repository..."
-    git clone https://github.com/stackfilesync/stack-sync-cli.git
-    cd stack-sync-cli
-
-    echo "Building binary..."
-    go build -o stack-sync ./cmd/stack-sync
-
+    
+    # Download binary
+    download_binary "$LATEST_VERSION"
+    
     # Install binary
-    INSTALL_DIR="/usr/local/bin"
     if [ ! -w "$INSTALL_DIR" ]; then
-        echo -e "${YELLOW}Need sudo permissions to install to $INSTALL_DIR${NC}"
-        sudo mv stack-sync "$INSTALL_DIR/"
+        echo -e "${YELLOW}🔐 Need sudo permissions to install to $INSTALL_DIR${NC}"
+        sudo mv "$BINARY_NAME" "$INSTALL_DIR/"
     else
-        mv stack-sync "$INSTALL_DIR/"
+        mv "$BINARY_NAME" "$INSTALL_DIR/"
     fi
-
+    
     # Clean up
     cd ~
     rm -rf "$TEMP_DIR"
-
-    echo -e "${GREEN}✓ Stack Sync installed successfully!${NC}"
-else
-    echo "Installing via Go..."
-    go install github.com/stackfilesync/stack-sync-cli/cmd/stack-sync@latest
-
-    # Check if GOPATH/bin is in PATH
-    if [[ ":$PATH:" != *":$HOME/go/bin:"* ]]; then
-        echo -e "${YELLOW}Warning: $HOME/go/bin is not in your PATH${NC}"
-        echo "Add this to your ~/.bashrc or ~/.zshrc:"
-        echo "  export PATH=\$PATH:\$HOME/go/bin"
-    fi
-
-    echo -e "${GREEN}✓ Stack Sync installed successfully!${NC}"
+    
+    echo -e "${GREEN}✓ Binary installed successfully!${NC}"
 fi
 
 # Verify installation
 if command -v stack-sync &> /dev/null; then
     echo ""
+    echo -e "${GREEN}🎉 Installation complete!${NC}"
+    echo ""
     echo "Stack Sync version:"
     stack-sync version
     echo ""
-    echo -e "${GREEN}Installation complete!${NC}"
+    echo -e "${BLUE}📚 Get started:${NC}"
+    echo "  1. Initialize config:  ${GREEN}stack-sync init${NC}"
+    echo "  2. Add a repository:   ${GREEN}stack-sync add${NC}"
+    echo "  3. Start syncing:      ${GREEN}stack-sync sync <repo-name>${NC}"
     echo ""
-    echo "Get started:"
-    echo "  1. Initialize config:  stack-sync init"
-    echo "  2. Add a repository:   stack-sync add"
-    echo "  3. Start syncing:      stack-sync"
+    echo "For more help: ${GREEN}stack-sync help${NC}"
     echo ""
-    echo "For more help: stack-sync help"
+    echo -e "${BLUE}🔗 Documentation: https://github.com/$REPO${NC}"
 else
-    echo -e "${RED}Installation failed. Please install manually.${NC}"
+    echo -e "${RED}❌ Installation failed. Please try alternative methods.${NC}"
+    echo ""
+    echo -e "${BLUE}📦 Alternative Installation Methods:${NC}"
+    echo ""
+    
+    case $OS in
+        "darwin")
+            echo -e "${GREEN}🍺 Homebrew (macOS):${NC}"
+            echo "  brew tap YOUR_USERNAME/stack-sync"
+            echo "  brew install stack-sync"
+            echo ""
+            echo "  Or if submitted to Homebrew Core:"
+            echo "  brew install stack-sync"
+            ;;
+        "linux")
+            echo -e "${GREEN}📦 Snap (Linux):${NC}"
+            echo "  sudo snap install stack-sync"
+            echo ""
+            echo -e "${GREEN}📦 AUR (Arch Linux):${NC}"
+            echo "  yay -S stack-sync-cli"
+            echo "  # or"
+            echo "  paru -S stack-sync-cli"
+            ;;
+    esac
+    
+    echo ""
+    echo -e "${BLUE}🔧 Manual Installation:${NC}"
+    echo "1. Download from: https://github.com/$REPO/releases"
+    echo "2. Install via Go: go install github.com/$REPO/cmd/stack-sync@latest"
+    echo ""
+    echo -e "${YELLOW}💡 Note: Package manager installations may take time to be available${NC}"
+    echo "   after the initial release. Use the direct installation method above"
+    echo "   for immediate access."
     exit 1
 fi

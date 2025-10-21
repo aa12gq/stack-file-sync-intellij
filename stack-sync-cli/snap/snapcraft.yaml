@@ -1,0 +1,26 @@
+name: stack-sync
+base: core20
+version: "1.1.0"
+summary: Interactive file synchronization tool
+description: |
+  Stack Sync CLI is an interactive file synchronization tool designed for development teams.
+  It provides a terminal-based UI for managing file synchronization across multiple repositories
+  with support for file watching and auto-sync capabilities.
+
+grade: stable
+confinement: strict
+
+parts:
+  stack-sync:
+    plugin: go
+    source: https://github.com/stackfilesync/stack-sync-cli.git
+    source-tag: v1.1.0
+    go-importpath: github.com/stackfilesync/stack-sync-cli
+
+apps:
+  stack-sync:
+    command: bin/stack-sync
+    plugs:
+      - home
+      - removable-media
+      - network

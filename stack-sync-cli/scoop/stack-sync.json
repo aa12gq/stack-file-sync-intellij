@@ -1,0 +1,21 @@
+{
+  "version": "1.1.0",
+  "description": "Interactive file synchronization tool for development teams",
+  "homepage": "https://github.com/stackfilesync/stack-sync-cli",
+  "license": "MIT",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/stackfilesync/stack-sync-cli/releases/download/v1.1.0/stack-sync-windows-amd64.exe",
+      "hash": "YOUR_HASH_HERE"
+    }
+  },
+  "bin": "stack-sync-windows-amd64.exe",
+  "checkver": "github",
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/stackfilesync/stack-sync-cli/releases/download/v$version/stack-sync-windows-amd64.exe"
+      }
+    }
+  }
+}
