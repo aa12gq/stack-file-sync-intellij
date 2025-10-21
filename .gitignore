@@ -9,6 +9,14 @@ build/
 .idea/jarRepositories.xml
 .idea/compiler.xml
 .idea/libraries/
+.idea/workspace.xml
+.idea/gradle.xml
+.idea/kotlinc.xml
+.idea/misc.xml
+.idea/other.xml
+.idea/caches/
+.idea/runConfigurations.xml
+.idea/AndroidProjectSystem.xml
 *.iws
 *.iml
 *.ipr
