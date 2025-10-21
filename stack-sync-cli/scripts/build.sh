@@ -5,7 +5,7 @@
 
 set -e
 
-VERSION="1.1.3"
+VERSION="1.1.4"
 BUILD_DIR="build"
 APP_NAME="stack-sync"
 
