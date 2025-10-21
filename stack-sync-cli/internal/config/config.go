@@ -21,6 +21,7 @@ type Settings struct {
 	BackupDir     string `yaml:"backup_dir"`
 	ShowIcons     bool   `yaml:"show_icons"`
 	ColorOutput   bool   `yaml:"color_output"`
+	Language      string `yaml:"language"` // Language setting: "en-US" or "zh-CN"
 }
 
 // Config represents the complete configuration
@@ -43,6 +44,7 @@ func DefaultConfig() *Config {
 			BackupDir:     filepath.Join(homeDir, ".stack-sync", "backups"),
 			ShowIcons:     true,
 			ColorOutput:   true,
+			Language:      "en-US", // Default to English
 		},
 		Repositories: []models.Repository{},
 	}

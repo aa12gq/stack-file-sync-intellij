@@ -1,157 +1,104 @@
-# Example Stack Sync Configuration
-# Copy this file to ~/.stack-sync/config.yml and customize
+# Stack Sync CLI 配置文件示例
+# 支持中英文界面切换
 
-# Sync server configuration (optional)
 server:
   url: "wss://sync-server.example.com"
-  api_key: ""
+  api_key: "your-api-key"
 
-# Global settings
 settings:
-  # Enable watch mode globally (default: false)
-  watch_mode: false
+  # 语言设置：支持 "en-US" (英文) 或 "zh-CN" (中文)
+  # 设置为中文后，所有命令和界面都会显示中文
+  language: "zh-CN"
 
-  # Auto sync interval in seconds (when watch mode is enabled)
-  auto_sync_interval: 30
-
-  # Enable backup before sync
+  # 备份设置
   backup_enabled: true
   backup_dir: "~/.stack-sync/backups"
 
-  # UI settings
+  # 界面设置
   show_icons: true
   color_output: true
 
-# Repository configurations
+# 仓库配置列表
 repositories:
-  # Example 1: SSH authentication (using SSH key)
   - name: "my-backend"
     url: "git@github.com:user/backend.git"
-    local_path: "/Users/username/projects/backend"
-    repo_type: "SSH"  # Optional: auto-detected from URL
-
-    # Enable watch mode for this repository
-    watch_mode: true
-
-    # Only sync files matching these patterns
-    sync_patterns:
-      - "src/**/*.go"
-      - "pkg/**/*.go"
-      - "cmd/**/*.go"
-      - "*.md"
-      - "go.mod"
-      - "go.sum"
-
-    # Exclude these patterns
-    exclude:
+    branch: "main"
+    source_directory: "src"
+    target_directory: "/Users/aa12/projects/backend/src"
+    local_path: "/Users/aa12/projects/backend/src"
+    file_patterns:
+      - "*.go"
+      - "*.mod"
+      - "*.sum"
+    exclude_patterns:
       - "*.log"
-      - "*.tmp"
-      - "vendor/"
-      - "bin/"
-      - ".DS_Store"
+      - "node_modules/"
+      - ".git/"
+    sync_patterns:
+      - "*.go"
+      - "*.mod"
+      - "*.sum"
+    exclude: []
+    watch_mode: false
+    backup_config:
+      enabled: true
+      max_backups: 10
+    post_sync_commands:
+      - directory: "/Users/aa12/projects/backend"
+        command: "go mod tidy"
+        order: 0
+      - directory: "/Users/aa12/projects/backend"
+        command: "go build ./..."
+        order: 1
+    repo_type: "SSH"
+    username: ""
+    password: ""
 
-  # Example 2: HTTPS with username/password
   - name: "frontend-app"
     url: "https://github.com/user/frontend.git"
-    local_path: "/Users/username/projects/frontend"
-    repo_type: "HTTPS"  # Optional: auto-detected from URL
-    username: "your-username"
-    password: "your-password"  # Or use Personal Access Token
-
-    # No watch mode for this repository
-    watch_mode: false
-
-    sync_patterns:
-      - "src/**/*.ts"
-      - "src/**/*.tsx"
-      - "src/**/*.css"
-      - "package.json"
-      - "tsconfig.json"
-
-    exclude:
+    branch: "develop"
+    source_directory: "src/components"
+    target_directory: "/Users/aa12/projects/frontend/src/components"
+    local_path: "/Users/aa12/projects/frontend/src/components"
+    file_patterns:
+      - "*.tsx"
+      - "*.ts"
+      - "*.css"
+    exclude_patterns:
+      - "*.test.*"
       - "node_modules/"
-      - "dist/"
-      - "build/"
-      - ".next/"
-
-  # Example 3: HTTPS with Personal Access Token (recommended for private repos)
-  - name: "private-repo"
-    url: "https://vcs.intra.example.com/team/project.git"
-    local_path: "/Users/username/projects/private-repo"
-    repo_type: "HTTPS"
-    username: "git"  # Can be any value when using token
-    password: "ghp_xxxxxxxxxxxxxxxxxxxx"  # Personal Access Token
-
     sync_patterns:
-      - "**/*.proto"
-
+      - "*.tsx"
+      - "*.ts"
+      - "*.css"
     exclude: []
-
-  # Example 4: Mobile app (SSH)
-  - name: "mobile-app"
-    url: "git@github.com:user/mobile.git"
-    local_path: "/Users/username/projects/mobile"
-    watch_mode: false
-
-    sync_patterns:
-      - "lib/**/*.dart"
-      - "android/**/*.kt"
-      - "ios/**/*.swift"
-      - "pubspec.yaml"
-
-    exclude:
-      - "build/"
-      - ".dart_tool/"
-      - ".flutter-plugins"
-
-  # Example 5: Documentation repo (HTTPS, public)
-  - name: "docs"
-    url: "https://github.com/user/docs.git"
-    local_path: "/Users/username/projects/docs"
-    watch_mode: true  # Auto-sync documentation
-    # No username/password needed for public repos
-
-    sync_patterns:
-      - "**/*.md"
-      - "**/*.mdx"
-      - "docs/**/*"
-
-    exclude:
-      - ".docusaurus/"
-      - "node_modules/"
-
-  # Example 6: Shared library (SSH)
-  - name: "shared-lib"
-    url: "git@github.com:user/shared-lib.git"
-    local_path: "/Users/username/projects/shared-lib"
-    watch_mode: false
-
-    # Sync all files (no patterns specified)
-    sync_patterns: []
-
-    exclude:
-      - "target/"
-      - "*.class"
-
-# Notes:
-# - Watch mode can be enabled globally or per-repository
-# - Per-repository settings override global settings
-# - Use sync_patterns to filter which files to sync
-# - Empty sync_patterns means sync all files
-# - Local paths should be absolute paths
+    watch_mode: true
+    backup_config:
+      enabled: true
+      max_backups: 5
+    post_sync_commands:
+      - directory: "/Users/aa12/projects/frontend"
+        command: "npm install"
+        order: 0
+      - directory: "/Users/aa12/projects/frontend"
+        command: "npm run build"
+        order: 1
+    repo_type: "HTTPS"
+    username: "your-username"
+    password: "your-token"
+# 中文命令示例：
 #
-# Authentication:
-# - SSH: Uses SSH key from ~/.ssh/id_rsa (default)
-#   - URL format: git@github.com:user/repo.git or ssh://git@github.com/user/repo.git
-#   - No username/password needed
-#   - Make sure your SSH key is added to ssh-agent
+# 设置 language: "zh-CN" 后，可以使用以下中文命令：
 #
-# - HTTPS with credentials:
-#   - URL format: https://github.com/user/repo.git
-#   - Set username and password fields
-#   - For private repos, use Personal Access Token as password
-#   - Some Git servers accept any username when using token (e.g., "git")
+# stack-sync 初始化          # 初始化配置
+# stack-sync 添加            # 添加仓库
+# stack-sync 同步            # 同步所有仓库
+# stack-sync 同步 my-backend # 同步指定仓库
+# stack-sync 列表            # 列出所有仓库
+# stack-sync 状态 my-backend # 查看仓库状态
+# stack-sync 删除 my-backend # 删除仓库
+# stack-sync 监控            # 启动文件监控
+# stack-sync 帮助            # 显示帮助信息
+# stack-sync 版本            # 显示版本信息
 #
-# - HTTPS without credentials (public repos only):
-#   - URL format: https://github.com/user/repo.git
-#   - No username/password needed
+# 所有界面提示和消息也会自动切换为中文

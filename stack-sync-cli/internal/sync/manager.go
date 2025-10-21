@@ -212,7 +212,10 @@ func (m *Manager) SyncRepositoryWithFilter(repo *models.Repository, filterKeywor
 		return nil
 	}
 
-	// Apply pre-filter if provided
+	// Show interactive file selection
+	fmt.Printf("Found %d files to sync:\n", len(availableFiles))
+
+	// Apply pre-filter if provided, but still allow full interactive selection
 	if filterKeyword != "" {
 		filteredFiles := m.preFilterFilesByKeyword(availableFiles, filterKeyword)
 		if len(filteredFiles) == 0 {
@@ -220,12 +223,11 @@ func (m *Manager) SyncRepositoryWithFilter(repo *models.Repository, filterKeywor
 			repo.Status = models.StatusUpToDate
 			return nil
 		}
-		fmt.Printf("Filtered to %d files matching '%s'\n", len(filteredFiles), filterKeyword)
+		fmt.Printf("Pre-filtered to %d files matching '%s'\n", len(filteredFiles), filterKeyword)
+		fmt.Println("You can still use interactive selection modes (keyboard, number, etc.)")
 		availableFiles = filteredFiles
 	}
 
-	// Show interactive file selection
-	fmt.Printf("Found %d files to sync:\n", len(availableFiles))
 	selectedFiles, err := m.selectFilesToSync(availableFiles, sourcePath)
 	if err != nil {
 		repo.Status = models.StatusError

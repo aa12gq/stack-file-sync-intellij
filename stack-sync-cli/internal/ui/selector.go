@@ -7,13 +7,28 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/manifoldco/promptui"
+	"github.com/stackfilesync/stack-sync-cli/internal/i18n"
 	"github.com/stackfilesync/stack-sync-cli/pkg/models"
 )
+
+// Global I18n instance for UI
+var globalI18n *i18n.I18n
+
+// SetI18n sets the global I18n instance for UI
+func SetI18n(i18n *i18n.I18n) {
+	globalI18n = i18n
+}
 
 // SelectRepository shows an interactive selector for repositories
 func SelectRepository(repos []models.Repository) (*models.Repository, error) {
 	if len(repos) == 0 {
 		return nil, fmt.Errorf("no repositories configured")
+	}
+
+	// Get localized label
+	label := "Select a repository to sync"
+	if globalI18n != nil {
+		label = globalI18n.T(i18n.MsgSelectRepository)
 	}
 
 	// Custom templates for the selector
@@ -43,7 +58,7 @@ func SelectRepository(repos []models.Repository) (*models.Repository, error) {
 	}
 
 	prompt := promptui.Select{
-		Label:     "Select a repository to sync",
+		Label:     label,
 		Items:     repos,
 		Templates: templates,
 		Size:      10,
