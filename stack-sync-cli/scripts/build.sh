@@ -52,6 +52,17 @@ for PLATFORM in "${PLATFORMS[@]}"; do
     echo -e "${GREEN}✓ Built: $BUILD_DIR/$OUTPUT_NAME${NC}"
 done
 
+# Create universal binary for macOS
+echo -e "\n${YELLOW}Creating universal binary for macOS...${NC}"
+if [[ -f "$BUILD_DIR/$APP_NAME-darwin-amd64" && -f "$BUILD_DIR/$APP_NAME-darwin-arm64" ]]; then
+    lipo -create -output "$BUILD_DIR/$APP_NAME-darwin-universal" \
+        "$BUILD_DIR/$APP_NAME-darwin-amd64" \
+        "$BUILD_DIR/$APP_NAME-darwin-arm64"
+    echo -e "${GREEN}✓ Created universal binary: $BUILD_DIR/$APP_NAME-darwin-universal${NC}"
+else
+    echo -e "${YELLOW}⚠ Skipping universal binary creation (missing platform binaries)${NC}"
+fi
+
 echo -e "\n${GREEN}Build complete!${NC}"
 echo "Binaries are in the $BUILD_DIR directory:"
 ls -lh "$BUILD_DIR"

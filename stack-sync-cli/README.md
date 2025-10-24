@@ -27,11 +27,8 @@ curl -fsSL https://raw.githubusercontent.com/stackfilesync/stack-sync-cli/main/s
 #### macOS
 
 ```bash
-# Homebrew (if you have a custom tap)
-brew tap YOUR_USERNAME/stack-sync
-brew install stack-sync
-
-# Or if submitted to Homebrew Core
+# Homebrew
+brew tap aa12gq/stack-sync
 brew install stack-sync
 ```
 
