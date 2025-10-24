@@ -65,6 +65,10 @@ For CLI installation and usage, please refer to the [CLI Documentation](./stack-
 **Quick CLI Install:**
 
 ```bash
+# Using Homebrew (macOS)
+brew tap aa12gq/stack-sync
+brew install stack-sync
+
 # Using install script
 curl -fsSL https://raw.githubusercontent.com/stackfilesync/stack-sync-cli/main/scripts/install.sh | bash
 

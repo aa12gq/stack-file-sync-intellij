@@ -14,7 +14,7 @@ import (
 )
 
 // Version will be set during build via ldflags
-var Version = "1.1.4"
+var Version = "1.1.5"
 
 // Global I18n instance
 var globalI18n *i18n.I18n
