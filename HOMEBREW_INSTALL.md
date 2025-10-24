@@ -4,23 +4,23 @@ This guide explains how to install `stack-sync` using Homebrew on macOS.
 
 ## Installation
 
-### Method 1: Using Our Custom Tap (Recommended)
+### Method 1: Direct Installation (Recommended)
+
+```bash
+# Install directly from our tap
+brew install aa12gq/stack-sync-cli/stack-sync
+```
+
+### Method 2: Using Our Custom Tap
+
+If you prefer to add the tap first:
 
 ```bash
 # Add our custom tap
-brew tap aa12gq/stack-sync
+brew tap aa12gq/stack-sync-cli
 
 # Install stack-sync
 brew install stack-sync
-```
-
-### Method 2: Direct Installation
-
-If you prefer to install directly from the tap repository:
-
-```bash
-# Install directly from the tap
-brew install aa12gq/stack-sync/stack-sync
 ```
 
 ## Verification

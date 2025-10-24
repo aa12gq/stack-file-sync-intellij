@@ -66,7 +66,7 @@ For CLI installation and usage, please refer to the [CLI Documentation](./stack-
 
 ```bash
 # Using Homebrew (macOS)
-brew tap aa12gq/stack-sync
+brew tap aa12gq/stack-sync-cli
 brew install stack-sync
 
 # Using install script

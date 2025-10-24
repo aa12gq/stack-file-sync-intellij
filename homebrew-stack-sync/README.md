@@ -1,12 +1,11 @@
-# Homebrew Stack Sync
+# Homebrew Stack Sync CLI
 
 This is a Homebrew tap for [Stack Sync CLI](https://github.com/aa12gq/stack-file-sync-intellij).
 
 ## Installation
 
 ```bash
-brew tap aa12gq/stack-sync
-brew install stack-sync
+brew install aa12gq/stack-sync-cli/stack-sync
 ```
 
 ## What is Stack Sync?
