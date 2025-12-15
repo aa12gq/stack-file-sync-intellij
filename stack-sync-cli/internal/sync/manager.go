@@ -1,11 +1,13 @@
 package sync
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -30,6 +32,80 @@ func NewManager(cfg *config.Config, i18nInstance *i18n.I18n) *Manager {
 	return &Manager{
 		config: cfg,
 		i18n:   i18nInstance,
+	}
+}
+
+// diffEntry represents a file diff entry for preview mode
+type diffEntry struct {
+	Path   string
+	Status string // A, M, D
+}
+
+// recordSyncHistory records sync history and displays change summary
+func (m *Manager) recordSyncHistory(repo *models.Repository, fileChanges []models.FileChange, startTime time.Time, success bool, errMsg string) {
+	// Calculate statistics
+	addedCount := 0
+	modifiedCount := 0
+	deletedCount := 0
+	
+	for _, change := range fileChanges {
+		switch change.ChangeType {
+		case models.ChangeTypeAdded:
+			addedCount++
+		case models.ChangeTypeModified:
+			modifiedCount++
+		case models.ChangeTypeDeleted:
+			deletedCount++
+		}
+	}
+
+	// Display change summary
+	fmt.Println("\n" + strings.Repeat("=", 60))
+	fmt.Println("📊 同步变更摘要 (Sync Change Summary)")
+	fmt.Println(strings.Repeat("=", 60))
+	fmt.Printf("总文件数: %d\n", len(fileChanges))
+	fmt.Printf("  ✅ 新增: %d 个文件\n", addedCount)
+	fmt.Printf("  🔄 修改: %d 个文件\n", modifiedCount)
+	fmt.Printf("  ❌ 删除: %d 个文件\n", deletedCount)
+	fmt.Println(strings.Repeat("-", 60))
+
+	// Show detailed file changes
+	if len(fileChanges) > 0 {
+		fmt.Println("\n详细变更列表 (Detailed Changes):")
+		for _, change := range fileChanges {
+			var icon string
+			switch change.ChangeType {
+			case models.ChangeTypeAdded:
+				icon = "✅"
+			case models.ChangeTypeModified:
+				icon = "🔄"
+			case models.ChangeTypeDeleted:
+				icon = "❌"
+			}
+			fmt.Printf("  %s %s\n", icon, change.Path)
+		}
+	}
+	fmt.Println(strings.Repeat("=", 60) + "\n")
+
+	// Create history entry
+	duration := time.Since(startTime).Milliseconds()
+	history := models.SyncHistory{
+		Repository:    repo.Name,
+		Branch:        repo.Branch,
+		Timestamp:     time.Now(),
+		Success:       success,
+		Error:         errMsg,
+		FileChanges:   fileChanges,
+		TotalFiles:    len(fileChanges),
+		AddedCount:    addedCount,
+		ModifiedCount: modifiedCount,
+		DeletedCount:  deletedCount,
+		Duration:      duration,
+	}
+
+	// Save history
+	if err := AddHistory(history); err != nil {
+		fmt.Printf("Warning: failed to save sync history: %v\n", err)
 	}
 }
 
@@ -123,9 +199,12 @@ func (m *Manager) SyncRepository(repo *models.Repository) error {
 
 	// Copy selected files from source to target
 	fmt.Printf("Syncing %d selected files from %s to %s...\n", len(selectedFiles), sourcePath, repo.TargetDirectory)
-	copiedFiles, err := m.copySelectedFiles(sourcePath, repo.TargetDirectory, selectedFiles)
+	startTime := time.Now()
+	copiedFiles, fileChanges, err := m.copySelectedFiles(sourcePath, repo.TargetDirectory, selectedFiles)
 	if err != nil {
 		repo.Status = models.StatusError
+		// Record failed sync
+		m.recordSyncHistory(repo, []models.FileChange{}, startTime, false, err.Error())
 		return fmt.Errorf("failed to copy files: %w", err)
 	}
 
@@ -136,6 +215,9 @@ func (m *Manager) SyncRepository(repo *models.Repository) error {
 	now := time.Now()
 	repo.LastSync = &now
 	repo.FilesTracked = copiedFiles
+
+	// Record sync history
+	m.recordSyncHistory(repo, fileChanges, startTime, true, "")
 
 	// Execute post-sync commands
 	if len(repo.PostSyncCommands) > 0 {
@@ -245,9 +327,12 @@ func (m *Manager) SyncRepositoryWithFilter(repo *models.Repository, filterKeywor
 
 	// Copy selected files from source to target
 	fmt.Printf("Syncing %d selected files from %s to %s...\n", len(selectedFiles), sourcePath, repo.TargetDirectory)
-	copiedFiles, err := m.copySelectedFiles(sourcePath, repo.TargetDirectory, selectedFiles)
+	startTime := time.Now()
+	copiedFiles, fileChanges, err := m.copySelectedFiles(sourcePath, repo.TargetDirectory, selectedFiles)
 	if err != nil {
 		repo.Status = models.StatusError
+		// Record failed sync
+		m.recordSyncHistory(repo, []models.FileChange{}, startTime, false, err.Error())
 		return fmt.Errorf("failed to copy files: %w", err)
 	}
 
@@ -258,6 +343,9 @@ func (m *Manager) SyncRepositoryWithFilter(repo *models.Repository, filterKeywor
 	now := time.Now()
 	repo.LastSync = &now
 	repo.FilesTracked = copiedFiles
+
+	// Record sync history
+	m.recordSyncHistory(repo, fileChanges, startTime, true, "")
 
 	// Execute post-sync commands
 	if len(repo.PostSyncCommands) > 0 {
@@ -365,9 +453,12 @@ func (m *Manager) SyncRepositoryWithNumberSelection(repo *models.Repository, fil
 
 	// Copy selected files from source to target
 	fmt.Printf("Syncing %d selected files from %s to %s...\n", len(selectedFiles), sourcePath, repo.TargetDirectory)
-	copiedFiles, err := m.copySelectedFiles(sourcePath, repo.TargetDirectory, selectedFiles)
+	startTime := time.Now()
+	copiedFiles, fileChanges, err := m.copySelectedFiles(sourcePath, repo.TargetDirectory, selectedFiles)
 	if err != nil {
 		repo.Status = models.StatusError
+		// Record failed sync
+		m.recordSyncHistory(repo, []models.FileChange{}, startTime, false, err.Error())
 		return fmt.Errorf("failed to copy files: %w", err)
 	}
 
@@ -378,6 +469,9 @@ func (m *Manager) SyncRepositoryWithNumberSelection(repo *models.Repository, fil
 	now := time.Now()
 	repo.LastSync = &now
 	repo.FilesTracked = copiedFiles
+
+	// Record sync history
+	m.recordSyncHistory(repo, fileChanges, startTime, true, "")
 
 	// Execute post-sync commands
 	if len(repo.PostSyncCommands) > 0 {
@@ -957,28 +1051,118 @@ func (m *Manager) filterFilesByKeyword(availableFiles []string) ([]string, error
 }
 
 // copySelectedFiles copies only the selected files from source to target
-func (m *Manager) copySelectedFiles(sourcePath, targetPath string, selectedFiles []string) (int, error) {
-	copiedCount := 0
+// Returns the number of files copied and a list of file changes
+func (m *Manager) copySelectedFiles(sourcePath, targetPath string, selectedFiles []string) (int, []models.FileChange, error) {
+	var fileChanges []models.FileChange
 
 	for _, relPath := range selectedFiles {
 		srcPath := filepath.Join(sourcePath, relPath)
 		dstPath := filepath.Join(targetPath, relPath)
 
+		// Check if destination file exists to determine change type
+		var changeType models.FileChangeType
+		dstInfo, err := os.Stat(dstPath)
+		if os.IsNotExist(err) {
+			changeType = models.ChangeTypeAdded
+		} else {
+			// File exists, check if it's modified by comparing modification time or size
+			srcInfo, err := os.Stat(srcPath)
+			if err != nil {
+				return len(fileChanges), fileChanges, fmt.Errorf("failed to stat source file %s: %w", relPath, err)
+			}
+			
+			// Compare modification time and size to determine if modified
+			if srcInfo.ModTime().After(dstInfo.ModTime()) || srcInfo.Size() != dstInfo.Size() {
+				changeType = models.ChangeTypeModified
+			} else {
+				changeType = models.ChangeTypeModified // Still mark as modified even if same, since we're syncing
+			}
+		}
+
 		// Create destination directory
 		dstDir := filepath.Dir(dstPath)
 		if err := os.MkdirAll(dstDir, 0755); err != nil {
-			return copiedCount, fmt.Errorf("failed to create directory %s: %w", dstDir, err)
+			return len(fileChanges), fileChanges, fmt.Errorf("failed to create directory %s: %w", dstDir, err)
+		}
+
+		// Get source file size
+		srcInfo, err := os.Stat(srcPath)
+		if err != nil {
+			return len(fileChanges), fileChanges, fmt.Errorf("failed to stat source file %s: %w", relPath, err)
 		}
 
 		// Copy file
 		if err := m.copyFile(srcPath, dstPath); err != nil {
-			return copiedCount, fmt.Errorf("failed to copy %s: %w", relPath, err)
+			return len(fileChanges), fileChanges, fmt.Errorf("failed to copy %s: %w", relPath, err)
 		}
 
-		copiedCount++
+		// Record file change
+		fileChanges = append(fileChanges, models.FileChange{
+			Path:      relPath,
+			ChangeType: changeType,
+			Size:      srcInfo.Size(),
+		})
 	}
 
-	return copiedCount, nil
+	return len(fileChanges), fileChanges, nil
+}
+
+// applyDiffSelections applies selected diff entries (including deletions) to target
+func (m *Manager) applyDiffSelections(sourcePath, targetPath string, entries []diffEntry) ([]models.FileChange, error) {
+	var changes []models.FileChange
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(sourcePath, entry.Path)
+		dstPath := filepath.Join(targetPath, entry.Path)
+
+		switch entry.Status {
+		case "D":
+			// Delete target file
+			info, err := os.Stat(dstPath)
+			if err != nil && !os.IsNotExist(err) {
+				return changes, fmt.Errorf("failed to stat target file %s: %w", entry.Path, err)
+			}
+			if err := os.Remove(dstPath); err != nil && !os.IsNotExist(err) {
+				return changes, fmt.Errorf("failed to delete %s: %w", entry.Path, err)
+			}
+			var size int64
+			if info != nil {
+				size = info.Size()
+			}
+			changes = append(changes, models.FileChange{
+				Path:       entry.Path,
+				ChangeType: models.ChangeTypeDeleted,
+				Size:       size,
+			})
+		default:
+			// Added or Modified -> copy from source
+			srcInfo, err := os.Stat(srcPath)
+			if err != nil {
+				return changes, fmt.Errorf("failed to stat source file %s: %w", entry.Path, err)
+			}
+
+			if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+				return changes, fmt.Errorf("failed to create directory %s: %w", filepath.Dir(dstPath), err)
+			}
+
+			if err := m.copyFile(srcPath, dstPath); err != nil {
+				return changes, fmt.Errorf("failed to copy %s: %w", entry.Path, err)
+			}
+
+			changeType := models.ChangeTypeModified
+			if entry.Status == "A" {
+				changeType = models.ChangeTypeAdded
+			}
+
+			changes = append(changes, models.FileChange{
+				Path:       entry.Path,
+				ChangeType: changeType,
+				Size:       srcInfo.Size(),
+			})
+		}
+	}
+
+	return changes, nil
 }
 
 // selectFilesWithKeyboard provides an interactive keyboard-based file selection
@@ -1156,4 +1340,312 @@ func (m *Manager) getTerminalHeight() int {
 
 	// Fallback to default
 	return 24
+}
+
+// SyncRepositoryWithDiff provides a visual diff preview before syncing
+func (m *Manager) SyncRepositoryWithDiff(repo *models.Repository) error {
+	repo.Status = models.StatusSyncing
+	startTime := time.Now()
+
+	// Create temp directory for cloning
+	tempDir, err := os.MkdirTemp("", "stack-sync-*")
+	if err != nil {
+		repo.Status = models.StatusError
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Clone repository to temp directory
+	fmt.Printf("Cloning %s @ %s to temp directory...\n", repo.URL, repo.Branch)
+	ops, err := git.Clone(repo, tempDir)
+	if err != nil {
+		repo.Status = models.StatusError
+		return fmt.Errorf("failed to clone repository: %w", err)
+	}
+
+	// Checkout specified branch
+	if repo.Branch != "" && repo.Branch != "main" && repo.Branch != "master" {
+		fmt.Printf("Checking out branch: %s\n", repo.Branch)
+		if err := ops.CheckoutBranch(repo.Branch); err != nil {
+			repo.Status = models.StatusError
+			return fmt.Errorf("failed to checkout branch %s: %w", repo.Branch, err)
+		}
+	}
+
+	// Backup if enabled
+	if repo.BackupConfig != nil && repo.BackupConfig.Enabled && m.directoryExists(repo.TargetDirectory) {
+		if err := m.BackupRepository(repo); err != nil {
+			fmt.Printf("Warning: backup failed: %v\n", err)
+		}
+	}
+
+	// Determine source path
+	sourcePath := tempDir
+	if repo.SourceDirectory != "" {
+		sourcePath = filepath.Join(tempDir, repo.SourceDirectory)
+	}
+
+	// Check if source directory exists
+	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+		repo.Status = models.StatusError
+		return fmt.Errorf("source directory does not exist: %s", repo.SourceDirectory)
+	}
+
+	// Ensure target directory exists
+	if err := os.MkdirAll(repo.TargetDirectory, 0755); err != nil {
+		repo.Status = models.StatusError
+		return fmt.Errorf("failed to create target directory: %w", err)
+	}
+
+	// Get diff entries
+	entries, err := m.getDiffEntries(sourcePath, repo.TargetDirectory, repo.FilePatterns, repo.ExcludePatterns)
+	if err != nil {
+		repo.Status = models.StatusError
+		return fmt.Errorf("failed to get diff: %w", err)
+	}
+
+	if len(entries) == 0 {
+		fmt.Println("No changes detected between remote and local. Up to date.")
+		repo.Status = models.StatusUpToDate
+		return nil
+	}
+
+	// Interactive preview & selection
+	selectedEntries, cancelled, err := m.previewDiffAndSelect(entries, sourcePath, repo.TargetDirectory)
+	if err != nil {
+		repo.Status = models.StatusError
+		return err
+	}
+	if cancelled {
+		fmt.Println("Diff preview cancelled. No files were synced.")
+		repo.Status = models.StatusUpToDate
+		return nil
+	}
+	if len(selectedEntries) == 0 {
+		fmt.Println("No files selected after diff preview. Nothing to sync.")
+		repo.Status = models.StatusUpToDate
+		return nil
+	}
+
+	// Apply selections (copy / delete)
+	fileChanges, err := m.applyDiffSelections(sourcePath, repo.TargetDirectory, selectedEntries)
+	if err != nil {
+		repo.Status = models.StatusError
+		m.recordSyncHistory(repo, []models.FileChange{}, startTime, false, err.Error())
+		return fmt.Errorf("failed to apply selected changes: %w", err)
+	}
+
+	// Update status
+	repo.Status = models.StatusUpToDate
+	now := time.Now()
+	repo.LastSync = &now
+	repo.FilesTracked = len(fileChanges)
+
+	// Record sync history
+	m.recordSyncHistory(repo, fileChanges, startTime, true, "")
+
+	// Execute post-sync commands
+	if len(repo.PostSyncCommands) > 0 {
+		if err := m.executePostSyncCommands(repo); err != nil {
+			fmt.Printf("Warning: post-sync command failed: %v\n", err)
+		}
+	}
+
+	return nil
+}
+
+// getDiffEntries runs git diff --no-index to collect change list
+func (m *Manager) getDiffEntries(sourcePath, targetPath string, patterns, excludes []string) ([]diffEntry, error) {
+	cmd := exec.Command("git", "diff", "--no-index", "--name-status", "--", targetPath, sourcePath)
+	output, err := cmd.Output()
+	if err != nil && !strings.Contains(err.Error(), "exit status 1") { // exit 1 means diff found
+		return nil, fmt.Errorf("git diff failed: %w", err)
+	}
+
+	var entries []diffEntry
+	seen := make(map[string]bool)
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	reTab := regexp.MustCompile(`\s+`)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		parts := reTab.Split(line, 2)
+		if len(parts) < 2 {
+			continue
+		}
+
+		status := strings.TrimSpace(parts[0])
+		pathPart := strings.TrimSpace(parts[1])
+
+		// Normalize path to relative
+		relPath := pathPart
+		if strings.HasPrefix(pathPart, sourcePath) {
+			if rp, err := filepath.Rel(sourcePath, pathPart); err == nil {
+				relPath = rp
+			}
+		} else if strings.HasPrefix(pathPart, targetPath) {
+			if rp, err := filepath.Rel(targetPath, pathPart); err == nil {
+				relPath = rp
+			}
+		}
+
+		relPath = filepath.ToSlash(relPath)
+
+		// Filter by patterns/excludes
+		if m.shouldExclude(relPath, excludes) {
+			continue
+		}
+		if !m.matchesPatterns(relPath, patterns) {
+			continue
+		}
+
+		// Normalize status (take first rune)
+		if len(status) > 0 {
+			status = string(status[0])
+		} else {
+			status = "M"
+		}
+
+		// Deduplicate
+		if seen[relPath] {
+			continue
+		}
+		seen[relPath] = true
+
+		entries = append(entries, diffEntry{
+			Path:   relPath,
+			Status: status,
+		})
+	}
+
+	return entries, nil
+}
+
+// previewDiffAndSelect lets user browse diffs and choose files to sync
+func (m *Manager) previewDiffAndSelect(entries []diffEntry, sourcePath, targetPath string) ([]diffEntry, bool, error) {
+	selected := make(map[int]bool)
+	for i := range entries {
+		selected[i] = true // default select all
+	}
+
+	reader := bufio.NewScanner(os.Stdin)
+
+	for {
+		fmt.Println()
+		fmt.Println(strings.Repeat("=", 80))
+		fmt.Println("📄  Diff Preview (v <n> 查看diff, t <n> 切换选择, a 全选, n 全不选, c 确认同步, q 取消)")
+		fmt.Println(strings.Repeat("-", 80))
+
+		for i, entry := range entries {
+			mark := "[ ]"
+			if selected[i] {
+				mark = "[x]"
+			}
+
+			icon := "M"
+			switch entry.Status {
+			case "A":
+				icon = "A"
+			case "D":
+				icon = "D"
+			}
+
+			fmt.Printf("%2d. %s %s %s\n", i+1, mark, icon, entry.Path)
+		}
+
+		fmt.Print("\n指令 (v <编号> / t <编号> / a / n / c / q): ")
+		if !reader.Scan() {
+			return nil, true, fmt.Errorf("failed to read input")
+		}
+		cmdLine := strings.TrimSpace(reader.Text())
+		if cmdLine == "" {
+			continue
+		}
+
+		parts := strings.Fields(cmdLine)
+		cmd := strings.ToLower(parts[0])
+
+		switch cmd {
+		case "v":
+			if len(parts) < 2 {
+				fmt.Println("请输入要查看的编号，例如: v 3")
+				continue
+			}
+			idx, err := strconv.Atoi(parts[1])
+			if err != nil || idx < 1 || idx > len(entries) {
+				fmt.Println("编号无效")
+				continue
+			}
+			entry := entries[idx-1]
+			if err := m.showFileDiff(entry, sourcePath, targetPath); err != nil {
+				fmt.Printf("显示 diff 失败: %v\n", err)
+			}
+		case "t":
+			if len(parts) < 2 {
+				fmt.Println("请输入要切换的编号，例如: t 3")
+				continue
+			}
+			idx, err := strconv.Atoi(parts[1])
+			if err != nil || idx < 1 || idx > len(entries) {
+				fmt.Println("编号无效")
+				continue
+			}
+			selected[idx-1] = !selected[idx-1]
+		case "a":
+			for i := range entries {
+				selected[i] = true
+			}
+		case "n":
+			for i := range entries {
+				selected[i] = false
+			}
+		case "c":
+			var result []diffEntry
+			for i, entry := range entries {
+				if selected[i] {
+					result = append(result, entry)
+				}
+			}
+			return result, false, nil
+		case "q":
+			return nil, true, nil
+		default:
+			fmt.Println("未知指令，请使用 v/t/a/n/c/q")
+		}
+	}
+}
+
+// showFileDiff renders a unified diff for a single file
+func (m *Manager) showFileDiff(entry diffEntry, sourcePath, targetPath string) error {
+	var left, right string
+
+	switch entry.Status {
+	case "A":
+		left = "/dev/null"
+		right = filepath.Join(sourcePath, entry.Path)
+	case "D":
+		left = filepath.Join(targetPath, entry.Path)
+		right = "/dev/null"
+	default:
+		left = filepath.Join(targetPath, entry.Path)
+		right = filepath.Join(sourcePath, entry.Path)
+	}
+
+	cmd := exec.Command("git", "diff", "--no-index", "--color=always", "--", left, right)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	// Ignore exit status 1 which indicates differences
+	if err := cmd.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			return nil
+		}
+		return err
+	}
+
+	return nil
 }

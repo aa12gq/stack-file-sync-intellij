@@ -2,8 +2,8 @@ class StackSync < Formula
   desc "Interactive file synchronization tool for development teams"
   homepage "https://github.com/aa12gq/stack-file-sync-intellij"
   # 默认使用 universal binary，支持所有 macOS 架构
-  url "https://github.com/aa12gq/stack-file-sync-intellij/releases/download/v1.1.5/stack-sync-darwin-universal.tar.gz"
-  sha256 "13f200db1238317a0949d4c7abff8c1f302522cd191d831274aa5cf11a4989a1"
+  url "https://github.com/aa12gq/stack-file-sync-intellij/releases/download/v1.2.0/stack-sync-darwin-universal.tar.gz"
+  sha256 "f2b2cbce9d1c48b0526ca9b7ebe84d5eff7cb090ea928205616a789257a09e65"
   license "MIT"
   head "https://github.com/aa12gq/stack-file-sync-intellij.git", branch: "main"
 
@@ -24,13 +24,13 @@ class StackSync < Formula
 
   on_linux do
     on_arm do
-      url "https://github.com/aa12gq/stack-file-sync-intellij/releases/download/v1.1.5/stack-sync-linux-arm64.tar.gz"
-      sha256 "ecb9708d708e3d5c8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8"
+      url "https://github.com/aa12gq/stack-file-sync-intellij/releases/download/v1.2.0/stack-sync-linux-arm64.tar.gz"
+      sha256 "63bfb23e12ddcecdca321fae7f84cd2bce430ac9e49846d0436941288ae7632b"
     end
     
     on_intel do
-      url "https://github.com/aa12gq/stack-file-sync-intellij/releases/download/v1.1.5/stack-sync-linux-amd64.tar.gz"
-      sha256 "7f70dd3e1888ea4c8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8"
+      url "https://github.com/aa12gq/stack-file-sync-intellij/releases/download/v1.2.0/stack-sync-linux-amd64.tar.gz"
+      sha256 "e61fbd20077cb6acbc6ba26672a85f1a7c2c72e7344f40bca5fc5ad281e84344"
     end
   end
 

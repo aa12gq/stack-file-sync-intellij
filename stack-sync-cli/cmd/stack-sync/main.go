@@ -14,7 +14,7 @@ import (
 )
 
 // Version will be set during build via ldflags
-var Version = "1.1.5"
+var Version = "1.2.0"
 
 // Global I18n instance
 var globalI18n *i18n.I18n
@@ -66,6 +66,8 @@ func main() {
 		statusCommand()
 	case "watch":
 		watchCommand()
+	case "history":
+		historyCommand()
 	case "help", "-h", "--help":
 		printHelp()
 	case "version", "-v", "--version":
@@ -150,6 +152,7 @@ func syncCommand() {
 
 	// Parse command line arguments
 	var repoName, filterKeyword, numberSelection string
+	var diffMode bool
 	args := os.Args[2:] // Skip "stack-sync" and "sync"
 
 	for i := 0; i < len(args); i++ {
@@ -160,6 +163,8 @@ func syncCommand() {
 		} else if arg == "-n" && i+1 < len(args) {
 			numberSelection = args[i+1]
 			i++ // Skip the next argument as it's the number selection value
+		} else if arg == "-d" || arg == "--diff" {
+			diffMode = true
 		} else if !strings.HasPrefix(arg, "-") {
 			// Repository name (not a flag)
 			repoName = arg
@@ -175,6 +180,15 @@ func syncCommand() {
 		}
 
 		ui.PrintInfo(globalI18n.T(i18n.MsgSyncing, repo.Name))
+
+		if diffMode {
+			if err := manager.SyncRepositoryWithDiff(repo); err != nil {
+				ui.PrintError("Sync failed: %v", err)
+				os.Exit(1)
+			}
+			ui.PrintSuccess("Successfully synced %s (diff preview mode)", repo.Name)
+			return
+		}
 
 		// Use appropriate sync method based on parameters
 		if numberSelection != "" {
@@ -556,6 +570,129 @@ func watchCommand() {
 	select {}
 }
 
+// historyCommand shows sync history
+func historyCommand() {
+	var repoName string
+	var limit int = 10
+
+	// Parse arguments
+	args := os.Args[2:]
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "-n" && i+1 < len(args) {
+			if l, err := strconv.Atoi(args[i+1]); err == nil {
+				limit = l
+			}
+			i++
+		} else if !strings.HasPrefix(arg, "-") {
+			repoName = arg
+		}
+	}
+
+	var histories []models.SyncHistory
+	var err error
+
+	if repoName != "" {
+		histories, err = sync.GetHistoryForRepository(repoName, limit)
+		if err != nil {
+			ui.PrintError("Failed to load history: %v", err)
+			os.Exit(1)
+		}
+	} else {
+		histories, err = sync.GetAllHistory(limit)
+		if err != nil {
+			ui.PrintError("Failed to load history: %v", err)
+			os.Exit(1)
+		}
+	}
+
+	if len(histories) == 0 {
+		if repoName != "" {
+			ui.PrintInfo("No sync history found for repository: %s", repoName)
+		} else {
+			ui.PrintInfo("No sync history found")
+		}
+		return
+	}
+
+	// Display history
+	fmt.Println()
+	fmt.Println(strings.Repeat("=", 80))
+	if repoName != "" {
+		fmt.Printf("📜 同步历史记录 - %s (Sync History - %s)\n", repoName, repoName)
+	} else {
+		fmt.Println("📜 同步历史记录 (Sync History)")
+	}
+	fmt.Println(strings.Repeat("=", 80))
+
+	for i, history := range histories {
+		fmt.Printf("\n[%d] %s\n", i+1, history.Timestamp.Format("2006-01-02 15:04:05"))
+		fmt.Printf("  仓库: %s @ %s\n", history.Repository, history.Branch)
+		
+		if history.Success {
+			fmt.Printf("  状态: ✅ 成功 (Success)\n")
+		} else {
+			fmt.Printf("  状态: ❌ 失败 (Failed)\n")
+			if history.Error != "" {
+				fmt.Printf("  错误: %s\n", history.Error)
+			}
+		}
+
+		fmt.Printf("  总文件数: %d\n", history.TotalFiles)
+		if history.AddedCount > 0 {
+			fmt.Printf("  ✅ 新增: %d\n", history.AddedCount)
+		}
+		if history.ModifiedCount > 0 {
+			fmt.Printf("  🔄 修改: %d\n", history.ModifiedCount)
+		}
+		if history.DeletedCount > 0 {
+			fmt.Printf("  ❌ 删除: %d\n", history.DeletedCount)
+		}
+		fmt.Printf("  耗时: %d ms\n", history.Duration)
+
+		// Show file changes if there are any
+		if len(history.FileChanges) > 0 && len(history.FileChanges) <= 20 {
+			fmt.Println("  变更文件:")
+			for _, change := range history.FileChanges {
+				var icon string
+				switch change.ChangeType {
+				case models.ChangeTypeAdded:
+					icon = "✅"
+				case models.ChangeTypeModified:
+					icon = "🔄"
+				case models.ChangeTypeDeleted:
+					icon = "❌"
+				}
+				fmt.Printf("    %s %s\n", icon, change.Path)
+			}
+		} else if len(history.FileChanges) > 20 {
+			fmt.Printf("  变更文件: (显示前20个，共%d个)\n", len(history.FileChanges))
+			for i, change := range history.FileChanges {
+				if i >= 20 {
+					break
+				}
+				var icon string
+				switch change.ChangeType {
+				case models.ChangeTypeAdded:
+					icon = "✅"
+				case models.ChangeTypeModified:
+					icon = "🔄"
+				case models.ChangeTypeDeleted:
+					icon = "❌"
+				}
+				fmt.Printf("    %s %s\n", icon, change.Path)
+			}
+		}
+
+		if i < len(histories)-1 {
+			fmt.Println(strings.Repeat("-", 80))
+		}
+	}
+
+	fmt.Println()
+	fmt.Println(strings.Repeat("=", 80))
+}
+
 // printHelp prints usage information
 func printHelp() {
 	if globalI18n.GetLanguage() == i18n.Chinese {
@@ -574,12 +711,14 @@ Stack Sync - 开发团队文件同步工具
     remove, rm <仓库> 从配置中删除仓库
     status [仓库]    显示仓库状态
     watch            启动文件监控器进行自动同步
+    history [仓库] [-n 数量] 显示同步历史记录
     help, -h         显示此帮助信息
     version, -v      显示版本信息
 
 选项:
     -f <关键词>      在选择前按关键词过滤文件
     -n <数字>        直接使用数字选择文件（如：77,93 或 1-5）
+    -d, --diff       进入可视化 diff 预览模式，逐文件查看后再同步
 
 示例:
     stack-sync                    # 交互模式
@@ -592,6 +731,9 @@ Stack Sync - 开发团队文件同步工具
     stack-sync sync              # 同步所有仓库
     stack-sync list              # 列出仓库
     stack-sync watch             # 启动自动同步监控器
+    stack-sync history           # 查看所有同步历史
+    stack-sync history my-repo   # 查看指定仓库的同步历史
+    stack-sync history my-repo -n 20 # 查看最近20条记录
 
 更多信息，请访问: https://github.com/aa12gq/stackfilesync/stack-sync-cli
 `)
@@ -611,12 +753,14 @@ COMMANDS:
     remove, rm <repo>  Remove a repository from config
     status [repo]      Show repository status
     watch              Start file watcher for auto-sync
+    history [repo] [-n limit] Show sync history
     help, -h           Show this help message
     version, -v        Show version information
 
 OPTIONS:
     -f <keyword>       Filter files by keyword before selection
     -n <numbers>       Directly select files by numbers (e.g., 77,93 or 1-5)
+    -d, --diff         Visual diff preview mode before syncing
 
 EXAMPLES:
     stack-sync                    # Interactive mode
@@ -629,6 +773,9 @@ EXAMPLES:
     stack-sync sync              # Sync all repositories
     stack-sync list              # List repositories
     stack-sync watch             # Start auto-sync watcher
+    stack-sync history           # Show all sync history
+    stack-sync history my-repo   # Show sync history for a repository
+    stack-sync history my-repo -n 20 # Show last 20 records
 
 For more information, visit: https://github.com/aa12gq/stackfilesync/stack-sync-cli
 `)
